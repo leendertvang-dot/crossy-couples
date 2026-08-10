@@ -174,6 +174,8 @@ const CFG = {
   rideTime    : 7.0,   /* schaap én bokje: je zit erop en rijdt door het verkeer */
   miles       : [10, 20, 30, 40],  /* verloving, bruiloft, baby's, rollators */
   storkTime   : 1.75,  /* hoe lang de ooievaar-animatie duurt */
+  finish      : 100,   /* eindpunt: kermisterrein, samen gewonnen */
+  partyTime   : 3.0,   /* hoe lang het feest duurt voor het eindscherm komt */
   bikeChance  : 0.07,  /* kans op een fietspad */
   boatChance  : 0.30   /* kans dat er een zeilboot in een waterrij ligt */
 };
@@ -588,19 +590,48 @@ const ZONES = [
   {n:'',             g:['#8FD82C','#7DC623'], gf:['#63A519','#589415'], lm:null},
   {n:'Hoevelaken',   g:['#93DA33','#81C927'], gf:['#66A81B','#5A9616'], lm:'manor'},   // Huis te Hoevelaken
   {n:'Woudenberg',   g:['#86D02E','#75BE24'], gf:['#5E9D18','#548C14'], lm:'castle'},  // Kasteel Geerestein
-  {n:'Amersfoort',   g:['#8ACF3A','#79BD2E'], gf:['#619B20','#57891A'], lm:'tower'},   // Onze Lieve Vrouwetoren
+  {n:'Amersfoort',   g:['#B5AFA4','#A9A398'], gf:['#8B857A','#7F796E'], lm:'tower', urban:1}, // stad: straatstenen
   {n:'Maartensdijk', g:['#98DE3E','#86CC31'], gf:['#6CAC24','#609A1E'], lm:'church'},  // dorpskerk uit 1555
-  {n:'Nijkerk',      g:['#8BD429','#7AC221'], gf:['#61A017','#568F13'], lm:'baroque'}  // witte barokke toren
+  {n:'Nijkerk',      g:['#8BD429','#7AC221'], gf:['#61A017','#568F13'], lm:'baroque'}, // witte barokke toren
+  {n:'Finish',       g:['#F0DCA6','#E6D097'], gf:['#C2AC78','#B8A26F'], lm:null}       // kermisterrein
 ];
+const ZFINISH = ZONES.length-1;
 const ZONE_START=12, ZONE_LEN=20;
 function zoneIdx(y){
+  if(y>=CFG.finish) return ZFINISH;
   if(y<ZONE_START) return 0;
-  return 1 + Math.floor((y-ZONE_START)/ZONE_LEN) % (ZONES.length-1);
+  return 1 + Math.floor((y-ZONE_START)/ZONE_LEN) % (ZONES.length-2);
 }
 
 /* ---------- wereldgeneratie ----------------------------------------------- */
 const XMIN=CFG.colMin, XMAX=CFG.colMax, TRACK=CFG.track, TRAINLEN=CFG.trainLen;
-let rows=new Map(), genY=0, run={type:'grass',left:0,dir:1}, T=0;
+const NCOL = XMAX-XMIN+1;
+const allCols = ()=>{ const a=[]; for(let i=0;i<NCOL;i++) a.push(true); return a; };
+let rows=new Map(), genY=0, run={type:'grass',left:0,dir:1,reach:allCols()}, T=0;
+
+/* Zorgt dat je nooit klem komt te staan: er is altijd minstens één vrije kolom
+   in de volgende rij die je vanaf je huidige positie kunt bereiken. */
+function keepPassable(r){
+  const free=allCols();
+  for(let i=0;i<r.obs.length;i++) free[r.obs[i].x-XMIN]=false;
+  let seed=[];
+  for(let i=0;i<NCOL;i++) if(free[i] && run.reach[i]) seed.push(i);
+  if(!seed.length){
+    const cand=[];
+    for(let i=0;i<NCOL;i++) if(run.reach[i]) cand.push(i);
+    const c = cand.length ? cand[(Math.random()*cand.length)|0] : (NCOL>>1);
+    free[c]=true;
+    r.obs = r.obs.filter(o=>o.x-XMIN!==c);
+    seed=[c];
+  }
+  const nr=[]; for(let i=0;i<NCOL;i++) nr.push(false);
+  for(let s=0;s<seed.length;s++){
+    const c=seed[s]; nr[c]=true;
+    for(let i=c-1;i>=0 && free[i];i--) nr[i]=true;
+    for(let i=c+1;i<NCOL && free[i];i++) nr[i]=true;
+  }
+  run.reach=nr;
+}
 
 const rnd=(a,b)=>a+Math.random()*(b-a);
 const ri =(a,b)=>Math.floor(rnd(a,b+1));
@@ -629,8 +660,20 @@ function nextType(y){
 }
 
 function genRow(y){
-  const type=(y<CFG.safeRows)?'grass':nextType(y), d=ramp(y), r={y,type};
+  const type = y>=CFG.finish ? 'finish'
+             : y<CFG.safeRows ? 'grass' : nextType(y);
+  const d=ramp(y), r={y,type};
   r.zone = zoneIdx(y);
+  if(type==='finish'){
+    r.alt=((y%2)+2)%2; r.obs=[]; run.reach=allCols();
+    const k=y-CFG.finish;
+    if(k===0) r.deco='gate';
+    else if(k===2) r.deco='tent';
+    else if(k===4) r.deco='ballpit';
+    else if(k===6) r.deco='frituur';
+    else if(k===9) r.deco='tent';
+    rows.set(y,r); return r;
+  }
   const zStep = y-ZONE_START;
   if(y>=ZONE_START && zStep%ZONE_LEN===0) r.sign = ZONES[r.zone].n;      /* kombord */
   if(y>=ZONE_START && (zStep%ZONE_LEN===7 || zStep%ZONE_LEN===15))
@@ -643,10 +686,12 @@ function genRow(y){
       for(let i=0;i<n && free.length>3;i++){
         const x=free.splice(ri(0,free.length-1),1)[0], q=Math.random();
         r.obs.push({x, kind:q<0.62?0:q<0.82?1:2, h:rnd(0.85,1.75),
+                    urban:!!ZONES[r.zone].urban,
                     pal:Math.random()<0.5?C.leaf:C.leaf2});
       }
       r.obs.sort((a,b)=>a.x-b.x);
     }
+    keepPassable(r);
     /* af en toe loopt er een schaapje (of een bokje) over de wei */
     if(y>=CFG.animalFrom && Math.random()<CFG.animalChance){
       r.animals=[{ x:rnd(XMIN,XMAX), kind:Math.random()<0.68?0:1,
@@ -662,7 +707,9 @@ function genRow(y){
       r.veh.push({o:p,len,col:pick(C.car),truck});
       p += len + rnd(2.4,4.2) - d*0.5;
     }
+    run.reach=allCols();          /* op wegen, water en spoor kun je overal staan */
   }else if(type==='bike'){
+    run.reach=allCols();
     /* fietspad: rustig tempo, één of twee fietsers, de eerste is Tante Trieza */
     r.dir = Math.random()<0.5?1:-1;
     r.speed = 1.9 + d*0.9 + rnd(0,0.5);
@@ -674,6 +721,7 @@ function genRow(y){
       p += 9 + rnd(0,4);
     }
   }else if(type==='water'){
+    run.reach=allCols();
     run.dir=-run.dir; r.dir=run.dir;
     r.speed=1.0+d*1.5+rnd(0,0.7); r.logs=[];
     let p=rnd(-13,13); const n=ri(3,4);
@@ -684,6 +732,7 @@ function genRow(y){
       p += len+rnd(1.5,2.6);
     }
   }else{
+    run.reach=allCols();
     r.dir=Math.random()<0.5?1:-1; r.state='idle'; r.timer=rnd(1.2,4.0);
     r.trainX=0; r.blink=0; r.gate=0;
   }
@@ -794,7 +843,7 @@ function mkPlayer(x, ch, mark){
 }
 let p1=null, p2=null, gs='menu', endT=0, countT=0;
 let sel=[null,null], wins=[0,0], stage=0, bannerT=0, deathOrder=0, ringT=0;
-let curZone=0, townT=0;
+let curZone=0, townT=0, finished=false, partyT=0;
 
 /* op het schaap spring je iets vlotter; met de bok neem je twee rijen tegelijk */
 function hopTimeOf(p){
@@ -802,9 +851,9 @@ function hopTimeOf(p){
 }
 
 function resetRound(){
-  rows.clear(); genY=0; run={type:'grass',left:0,dir:1}; T=0; camY=0; shake=0;
+  rows.clear(); genY=0; run={type:'grass',left:0,dir:1,reach:allCols()}; T=0; camY=0; shake=0;
   stage=0; bannerT=0; banner.style.opacity=0; deathOrder=0; ringT=0;
-  curZone=0; townT=0; townEl.style.opacity=0;
+  curZone=0; townT=0; townEl.style.opacity=0; finished=false; partyT=0;
   for(const p of P) p.life=0;
   p1 = mkPlayer(-1, CHARS[sel[0]!=null?sel[0]:0], '#2E8BE0');
   p2 = mkPlayer( 1, CHARS[sel[1]!=null?sel[1]:1], '#D82E8B');
@@ -925,10 +974,20 @@ function updPlayer(p,dt){
     }
   }
 
+  /* eindpunt bereikt: vanaf hier is het feest en heeft niemand meer haast */
+  if(!finished && p.y>=CFG.finish){
+    finished=true; partyT=CFG.partyTime;
+    showBanner('Samen gewonnen!');
+    for(let i=0;i<3;i++){
+      burst(p1.x, p1.py, 0.9, 8, BALLC[i%BALLC.length], 2.6);
+      burst(p2.x, p2.py, 0.9, 8, BALLC[(i+3)%BALLC.length], 2.6);
+    }
+  }
   hazards(p);
-  if(p.alive && p.py<killY()){ p.stork=true; die(p); }
+  if(p.alive && !finished && p.py<killY()){ p.stork=true; die(p); }
 }
 function hazards(p){
+  if(finished) return;
   if(p.stack || p.dropZ>0) return;             /* op schouders sta je boven het gevaar */
   const ry=Math.round(p.py);
   if(Math.abs(p.py-ry)>0.42) return;
@@ -989,17 +1048,85 @@ function drawGrassStrip(r){
   quad(PX(a,y-0.5),PY(a,y-0.5,0), PX(b,y-0.5),PY(b,y-0.5,0),
        PX(b,y-0.5),PY(b,y-0.5,z), PX(a,y-0.5),PY(a,y-0.5,z), Z.gf[r.alt]);
   flat(a,b,y-0.5,y+0.5,z,Z.g[r.alt]);
+  if(Z.urban){                       /* stadsbestrating: voegen tussen de klinkers */
+    ctx.beginPath();
+    const s=Math.ceil(a/0.5)*0.5;
+    for(let x=s;x<b;x+=0.5) flatPath(x-0.03, x+0.03, y-0.5, y+0.5, z+0.002);
+    flatPath(a,b, y-0.03, y+0.03, z+0.002);
+    ctx.fillStyle = r.alt ? '#948E84' : '#9E988D';
+    ctx.fill();
+  }
 }
 
 /* blauw kombord; het bord groeit mee met de lengte van de naam */
 function drawSign(r,y){
-  const x=XMIN-2.4;
-  const wTiles = (pixW(r.sign,2)+14)/TILE, hTiles = 26/(TILE*ZS);
+  const x=XMIN-2.2;
+  const wTiles = (pixW(r.sign,2)+16)/TILE, hTiles = 24/(TILE*ZS);
   box3(x, y, 0.11, 0.11, 0, 0.95, pal('#B8BCC4'));
   box3(x, y, 0.11, 0.11, 0, 0.10, pal('#8A8E96'));
-  box3(x, y, wTiles, 0.11, 0.95, hTiles, pal('#164C92'));
-  box3(x, y-0.06, wTiles-0.12, 0.03, 0.99, hTiles-0.09, pal('#2E74C8'));
-  say(x, y, 0.95+hTiles/2, r.sign, 1);
+  box3(x, y, wTiles, 0.11, 0.95, hTiles, pal('#F2F2F6'));            /* witte rand */
+  box3(x, y-0.058, wTiles-0.10, 0.02, 0.98, hTiles-0.07, pal('#164C92'));
+  /* tekst precies op het midden van het blauwe voorvlak */
+  say(x, y-0.062, 0.98+(hTiles-0.07)/2, r.sign, 1);
+}
+
+/* ---------- het kermisterrein bij de finish -------------------------------- */
+const BALLC=['#E2426B','#F5C21E','#3FB0DC','#5FBB4A','#B77BE0','#FF8A3D'];
+function drawBallpit(x,y){
+  const W2=1.45, D2=0.80;
+  box3(x, y, W2*2, D2*2, 0, 0.10, pal('#6EC9EC'));
+  box3(x, y+D2, W2*2+0.18, 0.16, 0, 0.46, pal('#DADEE4'));       /* achterrand */
+  box3(x-W2, y, 0.16, D2*2, 0, 0.46, pal('#E4E8EE'));
+  box3(x+W2, y, 0.16, D2*2, 0, 0.46, pal('#E4E8EE'));
+  let n=0;
+  for(let j=1;j>=-1;j--) for(let i=-2;i<=2;i++){
+    const c=BALLC[(n++)%BALLC.length];
+    box3(x+i*0.52+(j?0.13:0), y+j*0.46, 0.30, 0.30,
+         0.10+(((i+j)&1)?0.07:0), 0.28, pal(c));
+  }
+  box3(x, y-D2, W2*2+0.18, 0.16, 0, 0.46, pal('#F2F4F8'));       /* voorrand */
+}
+function drawTent(x,y){
+  box3(x, y, 2.5, 2.1, 0, 0.85, pal('#F4F2EC'));
+  for(let i=-2;i<=2;i++)
+    boxSides(x+i*0.50, y-1.06, 0.26, 0.03, 0, 0.85, pal(i%2 ? '#D8342C' : '#F4F2EC'));
+  const st=[[2.95,0.34],[2.40,0.32],[1.85,0.30],[1.30,0.28],[0.75,0.26]];
+  let z=0.85;
+  for(let i=0;i<st.length;i++){
+    box3(x, y, st[i][0], st[i][0]*0.84, z, st[i][1], pal(i%2 ? '#D8342C' : '#F6F4EE'));
+    z+=st[i][1];
+  }
+  box3(x, y, 0.12, 0.12, z, 0.36, pal('#C8CCD4'));
+  box3(x+0.24, y, 0.44, 0.10, z+0.22, 0.20, pal('#F5C21E'));
+  box3(x, y-1.06, 0.66, 0.06, 0, 0.60, pal('#2A2A32'));
+}
+function drawFrituur(x,y){
+  box3(x, y, 2.3, 0.85, 0, 1.55, pal('#DCDCE2'));
+  box3(x, y, 2.42, 0.95, 1.55, 0.16, pal('#B4B4BC'));
+  box3(x, y-0.38, 2.05, 0.14, 1.71, 0.44, pal('#D8342C'));
+  for(let i=-2;i<=2;i++) for(let j=0;j<2;j++){
+    boxSides(x+i*0.42, y-0.44, 0.32, 0.03, 0.40+j*0.50, 0.38, pal('#2A2A32'));
+    boxSides(x+i*0.42, y-0.46, 0.24, 0.02, 0.48+j*0.50, 0.20,
+             pal(j ? '#C8823A' : '#A85E2A'));      /* kroket / frikandel */
+  }
+  box3(x-0.95, y-0.44, 0.16, 0.10, 0.20, 0.14, pal('#F5C21E'));
+  say(x, y-0.46, 1.93, 'FRITUUR', 1);
+}
+function drawGate(y){
+  box3(-4.7, y, 0.20, 0.20, 0, 2.25, pal('#C8CCD4'));
+  box3( 4.7, y, 0.20, 0.20, 0, 2.25, pal('#C8CCD4'));
+  for(let i=-4;i<=4;i++)
+    box3(i*1.05, y+0.02, 0.40, 0.08, 1.52, 0.20,
+         pal(['#F5C21E','#3FB0DC','#5FBB4A','#E2426B'][((i%4)+4)%4]));
+  box3(0, y, 9.6, 0.12, 1.72, 0.52, pal('#F2F2F6'));
+  box3(0, y-0.062, 9.3, 0.02, 1.75, 0.46, pal('#D8342C'));
+  say(0, y-0.066, 1.98, 'FINISH', 1);
+}
+function drawDeco(kind,y){
+  if(kind==='gate')         drawGate(y);
+  else if(kind==='tent')    drawTent(-2.4, y);
+  else if(kind==='ballpit') drawBallpit(2.3, y);
+  else if(kind==='frituur') drawFrituur(-1.9, y);
 }
 
 /* de bekendste bouwwerken van de dorpen die je passeert */
@@ -1116,6 +1243,27 @@ function drawLandmark(kind, y){
   }
 }
 function drawObs(o,y){
+  if(o.urban){                       /* in de stad: plantenbak, kraampje, paaltjes */
+    if(o.kind===0){
+      box3(o.x,y,0.78,0.78,0.15,0.24, pal('#7E7469'));
+      box3(o.x,y,0.62,0.62,0.39,0.06, pal('#5A4A32'));
+      box3(o.x,y,0.24,0.24,0.45,0.28, C.trunk);
+      box3(o.x,y,0.72,0.72,0.73,o.h*0.8, o.pal);
+    }else if(o.kind===1){
+      box3(o.x,y,0.76,0.66,0.15,0.62, pal('#E4E2DA'));
+      box3(o.x,y,0.86,0.76,0.77,0.12, pal('#C03028'));
+      for(let i=-1;i<=1;i++)
+        boxSides(o.x+i*0.26, y-0.34, 0.20, 0.03, 0.77, 0.12, pal(i%2?'#F2F2F6':'#C03028'));
+      boxSides(o.x, y-0.34, 0.50, 0.03, 0.34, 0.34, pal('#3E4450'));
+    }else{
+      box3(o.x,y,0.72,0.72,0.15,0.10, pal('#8E877C'));
+      box3(o.x-0.18,y,0.16,0.16,0.25,0.44, pal('#3E4450'));
+      box3(o.x+0.18,y,0.16,0.16,0.25,0.44, pal('#3E4450'));
+      box3(o.x-0.18,y,0.20,0.20,0.69,0.07, pal('#C8A030'));
+      box3(o.x+0.18,y,0.20,0.20,0.69,0.07, pal('#C8A030'));
+    }
+    return;
+  }
   if(o.kind===0){ box3(o.x,y,0.34,0.34,0.15,0.30,C.trunk); box3(o.x,y,0.80,0.80,0.45,o.h,o.pal); }
   else if(o.kind===1){ box3(o.x,y,0.78,0.78,0.15,0.34,C.bush); box3(o.x,y,0.52,0.52,0.49,0.22,C.bushT); }
   else box3(o.x,y,0.72,0.72,0.15,0.46,C.rock);
@@ -1167,10 +1315,9 @@ function drawBubbles(){
   for(let i=0;i<bubN;i++){
     const b=bubPool[i];
     const sx=Math.round(PX(b.x,b.y)), sy=Math.round(PY(b.x,b.y,b.z));
-    if(b.s===1){                                   /* plaatsnaam op het kombord */
+    if(b.s===1){                                   /* plaatsnaam, vast op het kombord */
       if(sx<-90 || sx>W+90) continue;
-      const hw=pixW(b.t,2)/2+4;                     /* tekst binnen beeld houden */
-      pixText(b.t, Math.max(hw, Math.min(W-hw, sx)), sy, 2, '#FFFFFF');
+      pixText(b.t, sx, sy, 2, '#FFFFFF');
       continue;
     }
     ctx.font='bold 8px system-ui,-apple-system,sans-serif';
@@ -1259,9 +1406,21 @@ function drawLog(r,i,y){
   if(r.logs[i].boat) return drawBoat(r,i,y);
   box(logC(r,i), y, r.logs[i].len, 0.86, -0.02, 0.30, C.logT,C.logF,C.logS);
 }
+/* NS-intercity: witte bak met blauwe band, gele kop en donkere ramenstrook */
 function drawTrain(r,y){
-  box3(r.trainX,y,TRAINLEN,0.92,0.06,1.05,C.train);
-  box3(r.trainX+r.dir*(TRAINLEN/2-0.5),y,1.0,0.92,1.11,0.25,C.white);
+  const x=r.trainX, d=r.dir, L=TRAINLEN;
+  box3(x, y, L, 0.92, 0.06, 0.95, pal('#F2F2F4'));                 /* wagenbak */
+  box3(x, y, L, 0.96, 0.06, 0.26, pal('#1B4EA0'));                 /* blauwe band onder */
+  box3(x, y, L, 0.99, 1.01, 0.10, pal('#C8CCD4'));                 /* dak */
+  boxSides(x, y-0.47, L-0.5, 0.03, 0.62, 0.26, pal('#28303C'));    /* ramenstrook */
+  for(let i=-2;i<=2;i++)                                            /* deuren */
+    boxSides(x+i*1.5, y-0.47, 0.16, 0.03, 0.32, 0.58, pal('#D8DCE2'));
+  const fx = x + d*(L/2-0.55);
+  box3(fx, y, 1.10, 0.92, 0.06, 0.98, pal('#F5C21E'));             /* gele kop */
+  box3(fx, y, 1.10, 0.96, 0.06, 0.26, pal('#1B4EA0'));
+  boxSides(fx, y-0.47, 0.78, 0.03, 0.60, 0.30, pal('#1C2430'));    /* cabineruit */
+  box3(x + d*(L/2+0.02), y, 0.10, 0.60, 0.30, 0.16, pal('#E8E8EE'));
+  box3(x - d*(L/2-0.06), y, 0.08, 0.30, 0.20, 0.12, pal('#C03028'));
 }
 
 function drawPlayer(p){
@@ -1338,11 +1497,12 @@ function draw(){
   for(let y=yFar;y>=yNear;y--){
     const r=getRow(y);
     viewRange(y);
-    if(r.type==='grass') drawGrassStrip(r); else drawGround(r);
+    if(r.type==='grass'||r.type==='finish') drawGrassStrip(r); else drawGround(r);
 
     oN=0;
+    if(r.deco) push(r.deco==='ballpit' ? 2.3 : r.deco==='gate' ? 0 : -2.2, 11, r.deco);
     if(r.lm)   push(XMIN-2.2, 9, r.lm);
-    if(r.sign) push(XMIN-2.4, 10, r);
+    if(r.sign) push(XMIN-2.2, 10, r);
     if(r.type==='grass'){
       for(let i=0;i<r.obs.length;i++) push(r.obs[i].x,0,r.obs[i]);
       if(r.animals) for(let i=0;i<r.animals.length;i++){
@@ -1379,6 +1539,7 @@ function draw(){
         case 8: drawAnimal(oR[i],y); break;
         case 9: drawLandmark(oR[i],y); break;
         case 10: drawSign(oR[i],y); break;
+        case 11: drawDeco(oR[i],y); break;
       }
     }
   }
@@ -1522,11 +1683,20 @@ function frame(ts){
     let tg=-1e9;
     if(p1.alive) tg=Math.max(tg,p1.py);
     if(p2.alive) tg=Math.max(tg,p2.py);
+    if(finished) tg=Math.min(tg, CFG.finish+1);      /* bij de finish blijft de camera staan */
     if(tg>camY) camY += (tg-camY)*Math.min(1,dt*CFG.camFollow);
     acc+=dt;
     if(acc>1.5){ acc=0; const cut=Math.floor(camY-40);
       for(const k of rows.keys()) if(k<cut) rows.delete(k); }
-    if(gs==='dying'){
+    if(partyT>0){
+      partyT-=dt;
+      if(Math.random()<0.5){
+        const p = Math.random()<0.5 ? p1 : p2;
+        burst(p.x+rnd(-1,1), p.py+rnd(-1,1), 1.4, 2, pick(BALLC), 1.8);
+      }
+      if(partyT<=0){ winTogether(); }
+    }
+    else if(gs==='dying'){
       endT+=dt;
       if(endT > ((p1.stork||p2.stork) ? CFG.storkTime : 0.85)) finish();
     }
@@ -1546,6 +1716,20 @@ function frame(ts){
   if(p1) draw();
 }
 
+/* rij 100 gehaald: het potje is voor allebei */
+function winTogether(){
+  gs='over';
+  wins[0]++; wins[1]++;
+  endTitle.textContent='Samen gewonnen!';
+  endSub.textContent = p1.name+' en '+p2.name+' haalden samen het eind van de weg — '
+    + 'ballenbad, circus en een frituurpan vol kroketten. '
+    + (stage>=4 ? 'Getrouwd, kinderen groot, en nog steeds samen op pad.'
+      : stage>=3 ? 'Met de hele kinderschare erbij.'
+      : stage>=2 ? 'Als getrouwd stel.' : '');
+  sfxWin(); hud();
+  endScr.classList.remove('hide');
+  if(navigator.vibrate) try{navigator.vibrate([60,50,60,50,120]);}catch(e){}
+}
 function einde(p){
   return p.stork ? 'werd op rij '+p.score+' door de ooievaar opgehaald'
        : p.sink  ? 'verdween op rij '+p.score+' in het water'
@@ -1696,10 +1880,7 @@ document.addEventListener('visibilitychange', ()=>{
 
 resize();
 resetRound();          /* wereld draait als achtergrond achter het menu */
-$('sub').innerHTML='Kies allebei een personage. Tik = vooruit, veeg = links, rechts of achteruit.<br>'
-  + 'Spring op elkaars schouders en lift mee — maar meegelifte rijen tellen niet. Op een '
-  + 'schaap of bokje rijd je dwars door het verkeer. Wie achterblijft wordt door de ooievaar '
-  + 'opgehaald; de ander speelt door. Onderweg gaan jullie van verloving naar rollator.';
+$('sub').innerHTML='Tik = vooruit, veeg = opzij of terug.<br>Haal samen rij 100.';
 requestAnimationFrame(frame);
 </script>
 </body>
