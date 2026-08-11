@@ -68,6 +68,26 @@
     font-size:11px;font-weight:800;color:#fff;text-shadow:1px 1px 0 #000;line-height:1.45}
 
   #pickHead{font-size:17px}
+  #world{display:flex;gap:8px}
+  #world.hide{display:none}
+  .wbtn{pointer-events:auto;background:rgba(255,255,255,.10);color:#fff;border:3px solid rgba(255,255,255,.25);
+    border-radius:8px;padding:7px 14px;font-size:13px;font-weight:900;letter-spacing:.06em;
+    text-transform:uppercase;cursor:pointer;
+    display:inline-flex;align-items:center;gap:8px}
+  .wbtn.on{background:#F5D33C;color:#3A2A00;border-color:#000}
+
+  /* vlaggetjes in CSS getekend — emoji-vlaggen doen het niet op Windows */
+  .flag{position:relative;flex:0 0 auto;width:22px;height:15px;border-radius:2px;
+    border:1px solid rgba(0,0,0,.55);box-shadow:0 1px 0 rgba(0,0,0,.25);overflow:hidden}
+  .flag.nl{background:linear-gradient(#AE1C28 0 33.3%,#F5F5F5 33.3% 66.6%,#21468B 66.6% 100%)}
+  .flag.us{background:linear-gradient(#B22234 0 7.7%,#F5F5F5 7.7% 15.4%,#B22234 15.4% 23.1%,
+    #F5F5F5 23.1% 30.8%,#B22234 30.8% 38.5%,#F5F5F5 38.5% 46.2%,#B22234 46.2% 53.9%,
+    #F5F5F5 53.9% 61.6%,#B22234 61.6% 69.3%,#F5F5F5 69.3% 77%,#B22234 77% 84.7%,
+    #F5F5F5 84.7% 92.4%,#B22234 92.4% 100%)}
+  .flag.us::before{content:'';position:absolute;left:0;top:0;width:45%;height:53.9%;
+    background:#3C3B6E;
+    background-image:radial-gradient(#fff .55px,transparent .6px);
+    background-size:2.3px 2.3px;background-position:.6px .6px}
   #grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;width:100%;max-width:330px;
     max-height:56vh;overflow-y:auto;padding:2px;touch-action:pan-y}
   .card{pointer-events:auto;background:rgba(255,255,255,.10);border:3px solid rgba(255,255,255,.18);
@@ -90,6 +110,24 @@
     font-size:13px;letter-spacing:.13em;text-transform:uppercase;font-weight:800;
     color:rgba(255,255,255,.56);text-shadow:0 1px 0 rgba(0,0,0,.6);pointer-events:none}
   #credit sup{font-size:8px;vertical-align:super;letter-spacing:0}
+
+  /* ranglijst */
+  #lbSub{font-size:11.5px;color:#CFE3BE;font-weight:700;text-shadow:1px 1px 0 #000;
+    letter-spacing:.04em;margin-top:-6px}
+  #lbBox{width:100%;max-width:360px;max-height:56vh;overflow-y:auto;touch-action:pan-y;
+    background:rgba(0,0,0,.30);border:3px solid rgba(255,255,255,.18);border-radius:9px;padding:6px}
+  #lbMsg{color:#fff;font-size:12.5px;font-weight:700;padding:14px 8px;line-height:1.5;
+    text-shadow:1px 1px 0 #000}
+  table.lb{width:100%;border-collapse:collapse;color:#fff;font-size:12px}
+  table.lb th{font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:#BFD8AC;
+    padding:4px 3px;text-align:right;font-weight:900}
+  table.lb th:nth-child(1),table.lb th:nth-child(2){text-align:left}
+  table.lb td{padding:4px 3px;text-align:right;font-weight:700;
+    border-top:1px solid rgba(255,255,255,.10)}
+  table.lb td:nth-child(1){text-align:left;color:#F5D33C;width:20px}
+  table.lb td:nth-child(2){text-align:left}
+  table.lb td.tot{color:#F5D33C;font-weight:900}
+  table.lb tr.top td{background:rgba(245,211,60,.10)}
 
   /* liggende telefoon: het speelveld wordt dan te laag om iets te zien */
   #rotate{display:none}
@@ -120,6 +158,7 @@
     <div id="banner" class="pix"></div>
     <div id="town"><span></span></div>
     <div id="btns">
+      <button id="home" title="Terug naar het beginscherm">⌂</button>
       <button id="mute" title="Geluid">♪</button>
       <button id="fs" title="Volledig scherm">⛶</button>
     </div>
@@ -133,7 +172,10 @@
       <div class="zone">SPELER 1<br>linkerhelft</div>
       <div class="zone">SPELER 2<br>rechterhelft</div>
     </div>
-    <button class="btn" id="toPick">Kies personages</button>
+    <div class="row">
+      <button class="btn" id="toPick">Kies personages</button>
+      <button class="btn alt small" id="toLb">Ranglijst</button>
+    </div>
     <div id="iosnote"></div>
     <div id="credit">Brought to you by Leen &amp; Co<sup>TM</sup></div>
   </div>
@@ -141,11 +183,24 @@
   <!-- keuzescherm -->
   <div id="pick" class="scr hide">
     <div id="pickHead" class="pix">Speler 1 kiest</div>
+    <div id="world" class="hide">
+      <button class="wbtn on" data-s="0"><span class="flag nl"></span>Nederland</button>
+      <button class="wbtn"    data-s="1"><span class="flag us"></span>Amerika</button>
+    </div>
     <div id="grid"></div>
     <div class="row">
+      <button class="btn alt small" id="homePick">Home</button>
       <button class="btn alt small" id="clearSel">Wis</button>
       <button class="btn" id="startBtn" disabled>Start</button>
     </div>
+  </div>
+
+  <!-- ranglijst -->
+  <div id="lb" class="scr hide">
+    <div class="pix" style="font-size:20px">Ranglijst</div>
+    <div id="lbSub">per personage, alle potjes bij elkaar</div>
+    <div id="lbBox"><div id="lbMsg">Laden…</div></div>
+    <button class="btn" id="lbClose">Terug</button>
   </div>
 
   <!-- eindscherm -->
@@ -157,14 +212,24 @@
     <div class="row">
       <button class="btn" id="again">Opnieuw</button>
       <button class="btn alt small" id="swap">Ander personage</button>
+      <button class="btn alt small" id="lbEnd">Ranglijst</button>
+      <button class="btn alt small" id="homeEnd">Home</button>
     </div>
   </div>
 </div>
 
 <script>
 "use strict";
+
+/* ===========================================================================
+   RANGLIJST — plak hier de webapp-URL uit Apps Script (eindigt op /exec),
+   tussen de aanhalingstekens. Laat hem leeg als je geen gedeelde ranglijst
+   wilt; het spel werkt dan gewoon zonder. Uitleg in leaderboard-appsscript.gs.
+   =========================================================================== */
+const SCORE_URL = 'https://script.google.com/macros/s/AKfycbwzi4AogncrZL1HwZ-x52Kr9tms4_ui8F6pp0xCrAM7HMEiXNm0KtvD_mxCz8NwFzGdZQ/exec';
+
 /* ==========================================================================
-   CROSSY DUEL — lokale 2-speler hopper in Crossy-Road-stijl
+   CROSSY COUPLES — lokale 2-speler hopper in Crossy-Road-stijl
    Eén wereld, één camera, laatste die leeft wint de ronde.
    Alles wat je wilt tweaken staat in CFG en CHARS hieronder.
    ========================================================================== */
@@ -664,7 +729,7 @@ function renderPreview(canvas, ch){
    Elke zone heeft een eigen grastint, een blauw kombord bij binnenkomst en het
    bekendste bouwwerk van die plaats langs de kant van de weg.
    ---------------------------------------------------------------------------- */
-const ZONES = [
+const ZONES_NL = [
   {n:'',             g:['#8FD82C','#7DC623'], gf:['#63A519','#589415'], lm:null},
   {n:'Hoevelaken',   g:['#93DA33','#81C927'], gf:['#66A81B','#5A9616'], lm:'manor'},   // Huis te Hoevelaken
   {n:'Woudenberg',   g:['#86D02E','#75BE24'], gf:['#5E9D18','#548C14'], lm:'castle'},  // Kasteel Geerestein
@@ -673,7 +738,28 @@ const ZONES = [
   {n:'Nijkerk',      g:['#8BD429','#7AC221'], gf:['#61A017','#568F13'], lm:'baroque'}, // witte barokke toren
   {n:'Finish',       g:['#F0DCA6','#E6D097'], gf:['#C2AC78','#B8A26F'], lm:null}       // kermisterrein
 ];
-const ZFINISH = ZONES.length-1;
+/* Tweede wereld: Georgia, USA. Droger gras, gele wegbelijning, groene borden. */
+const ZONES_US = [
+  {n:'',          g:['#A8C64A','#98B640'], gf:['#7A9430','#6E882A'], lm:null},
+  {n:'Athens',    g:['#AECC50','#9EBC46'], gf:['#809A34','#748E2E'], lm:'bulldogs'},
+  {n:'Macon',     g:['#B6C85A','#A6B850'], gf:['#88963C','#7C8A36'], lm:'arches'},
+  {n:'Atlanta',   g:['#B0AAA0','#A49E94'], gf:['#868076','#7A746A'], lm:'diner', urban:1},
+  {n:'Savannah',  g:['#A2C84E','#92B844'], gf:['#769632','#6A8A2C'], lm:'chicken'},
+  {n:'Augusta',   g:['#AAC84C','#9AB842'], gf:['#7C9630','#708A2A'], lm:'watertower'},
+  {n:'Finish',    g:['#EFD9A0','#E5CD91'], gf:['#C1A972','#B79F69'], lm:null}
+];
+let ZONES = ZONES_NL;
+const ZFINISH = ZONES_NL.length-1;
+
+/* alles wat per wereld verschilt */
+const SCEN = [
+  {naam:'Nederland', road:['#4C4C55','#454550'], line:'#E9E9EE', mid:'#E9E9EE',
+   bord:'#164C92', snel:1.00, muziek:1.00, fiets:'Tante Trieza', boot:'Massss'},
+  {naam:'Amerika',   road:['#4A4640','#43403A'], line:'#EFEFF2', mid:'#F2C21C',
+   bord:'#1E6B3A', snel:1.28, muziek:1.50, fiets:'Go Dawgs!',    boot:'Sweet tea'}
+];
+let scenario = 0, usaUnlocked = false;
+const SC = ()=>SCEN[scenario];
 const ZONE_START=12, ZONE_LEN=20;
 function zoneIdx(y){
   if(y>=CFG.finish) return ZFINISH;
@@ -783,11 +869,13 @@ function genRow(y){
     }
   }else if(type==='road'){
     run.dir=-run.dir; r.dir=run.dir;
-    r.speed=1.3+d*2.0+rnd(0,0.7); r.veh=[];
+    r.speed=(1.3+d*2.0+rnd(0,0.7))*SC().snel; r.veh=[];
     let p=rnd(-13,13); const n=ri(2,3);
     for(let i=0;i<n;i++){
-      const truck=Math.random()<0.24, len=truck?2.3:1.35;
-      r.veh.push({o:p,len,col:pick(C.car),truck});
+      const q=Math.random();
+      const bus = scenario===1 && q<0.20, truck = !bus && q<0.36;
+      const len = bus?2.7 : truck?2.3 : 1.35;
+      r.veh.push({o:p, len, col: bus?'#F2B713':pick(C.car), truck, bus});
       p += len + rnd(3.2,5.2) - d*0.4;
     }
     run.reach=allCols();          /* op wegen, water en spoor kun je overal staan */
@@ -799,7 +887,7 @@ function genRow(y){
     r.veh = [];
     let p=rnd(-13,13); const n=ri(1,2);
     for(let i=0;i<n;i++){
-      r.veh.push({o:p, len:0.95, bike:true, say:i===0?'Tante Trieza':null,
+      r.veh.push({o:p, len:0.95, bike:true, say:i===0?SC().fiets:null,
                   col:pick(['#E2568C','#59B0D8','#E8A93C'])});
       p += 9 + rnd(0,4);
     }
@@ -816,7 +904,7 @@ function genRow(y){
     const boatAt = Math.random()<CFG.boatChance ? ri(0,n-1) : -1;
     for(let i=0;i<n;i++){
       const boat = i===boatAt, len = boat ? 3 : ri(2,3);
-      r.logs.push({o:p, len, boat, say: boat?'Massss':null});
+      r.logs.push({o:p, len, boat, say: boat?SC().boot:null});
       p += len+rnd(1.1,2.0);
     }
   }else{
@@ -1155,16 +1243,19 @@ function drawGround(r){
     ctx.fillStyle=C.line; ctx.fill();
   }
   else if(r.type==='road'){
-    flat(a,b,y-0.5,y+0.5,0,C.road[y&1]);
+    const S=SC();
+    flat(a,b,y-0.5,y+0.5,0,S.road[y&1]);
     const nx=rows.get(y+1), pv=rows.get(y-1);
-    ctx.beginPath();
-    if(nx && nx.type==='road'){
+    if(nx && nx.type==='road'){            /* middenstreep: wit in NL, geel in de VS */
+      ctx.beginPath();
       const s=Math.ceil(a/2.2)*2.2;
       for(let x=s;x<b;x+=2.2) flatPath(x,Math.min(x+1.1,b), y+0.46, y+0.53, 0.002);
+      ctx.fillStyle=S.mid; ctx.fill();
     }
+    ctx.beginPath();
     if(!pv || pv.type!=='road') flatPath(a,b,y-0.5,y-0.43,0.002);
     if(!nx || nx.type!=='road') flatPath(a,b,y+0.43,y+0.5,0.002);
-    ctx.fillStyle=C.line; ctx.fill();
+    ctx.fillStyle=S.line; ctx.fill();
   }else if(r.type==='water'){
     flat(a,b,y-0.5,y+0.5,0,C.water);
     flat(a,b,y-0.5,y-0.34,0,C.waterD);
@@ -1212,7 +1303,7 @@ function drawSign(r,y){
   box3(x, y, 0.11, 0.11, 0, 0.95, pal('#B8BCC4'));
   box3(x, y, 0.11, 0.11, 0, 0.10, pal('#8A8E96'));
   box3(x, y, wTiles, 0.11, 0.95, hTiles, pal('#F2F2F6'));            /* witte rand */
-  box3(x, y-0.058, wTiles-0.10, 0.02, 0.98, hTiles-0.07, pal('#164C92'));
+  box3(x, y-0.058, wTiles-0.10, 0.02, 0.98, hTiles-0.07, pal(SC().bord));
   /* tekst precies op het midden van het blauwe voorvlak */
   say(x, y-0.062, 0.98+(hTiles-0.07)/2, r.sign, 1);
 }
@@ -1363,6 +1454,79 @@ function drawLandmark(kind, y){
     win(0.15,-0.68, 0.42, 0.32, 0.58); win(0.95,-0.68, 0.42, 0.32, 0.58);
     win(1.72,-0.68, 0.42, 0.32, 0.58);
     box3(x-0.85, y-0.58, 0.42, 0.06, 0, 0.72, DOOR);
+  }
+  /* ---- Georgia, USA ---- */
+  else if(kind==='arches'){              /* burgertent met gouden bogen */
+    const G=pal('#F2B713');
+    box3(x-0.3, y, 2.6, 1.5, 0, 1.05, pal('#B8352A'));
+    box3(x-0.3, y, 2.75, 1.65, 1.05, 0.16, pal('#8E2A22'));
+    win(-1.3,-0.80, 0.42, 0.46, 0.46); win(-0.3,-0.80, 0.42, 0.46, 0.46);
+    win(0.7,-0.80, 0.42, 0.46, 0.46);
+    box3(x-0.3, y-0.80, 0.52, 0.06, 0, 0.72, DOOR);
+    box3(x+1.75, y, 0.30, 0.30, 0, 2.10, pal('#C8C8D0'));          /* mast aan de wegkant */
+    for(let s=-1;s<=1;s+=2){                                        /* twee gouden bogen */
+      box3(x+1.75+s*0.40, y, 0.30, 0.34, 2.10, 0.95, G);
+      box3(x+1.75+s*0.40, y, 0.30, 0.34, 3.05, 0.26, G);
+    }
+    box3(x+1.75, y, 1.10, 0.34, 3.20, 0.26, G);
+    box3(x+1.75, y-0.20, 1.35, 0.10, 1.42, 0.42, pal('#B8352A'));
+    say(x+1.75, y-0.22, 1.63, 'BURGERS', 1);
+  }
+  else if(kind==='chicken'){             /* kiptent met rood-wit bord */
+    box3(x-0.4, y, 2.5, 1.45, 0, 1.10, pal('#F4F2EC'));
+    box3(x-0.4, y, 2.65, 1.60, 1.10, 0.18, pal('#C8302E'));
+    win(-1.4,-0.78, 0.44, 0.46, 0.48); win(-0.4,-0.78, 0.44, 0.46, 0.48);
+    win(0.6,-0.78, 0.44, 0.46, 0.48);
+    box3(x-0.4, y-0.78, 0.52, 0.06, 0, 0.74, DOOR);
+    box3(x+1.75, y, 0.26, 0.26, 0, 1.55, pal('#C8C8D0'));
+    box3(x+1.75, y, 1.70, 0.12, 1.55, 0.62, pal('#C8302E'));
+    say(x+1.75, y-0.07, 1.86, 'CHICKEN', 1);
+    box3(x+1.75, y, 0.52, 0.44, 2.17, 0.34, pal('#F6F6F2'));       /* kippetje op het bord */
+    box3(x+1.75, y-0.10, 0.28, 0.24, 2.51, 0.24, pal('#F6F6F2'));
+    box3(x+1.75, y-0.10, 0.14, 0.12, 2.72, 0.12, pal('#D8342C'));
+    box3(x+1.75, y-0.26, 0.12, 0.10, 2.60, 0.09, pal('#F2941C'));
+  }
+  else if(kind==='bulldogs'){            /* stadionspandoek in rood en zwart */
+    box3(x-1.7, y, 0.26, 0.26, 0, 2.60, pal('#C8C8D0'));
+    box3(x+1.7, y, 0.26, 0.26, 0, 2.60, pal('#C8C8D0'));
+    box3(x, y, 3.7, 0.12, 1.70, 1.00, pal('#B01C2E'));
+    box3(x, y-0.065, 3.5, 0.02, 1.76, 0.88, pal('#111117'));
+    say(x, y-0.07, 2.42, 'GEORGIA', 1);
+    /* bulldogkop */
+    box3(x-1.05, y-0.09, 0.52, 0.10, 1.80, 0.44, pal('#E4E0D6'));
+    box3(x-1.05, y-0.12, 0.30, 0.08, 1.78, 0.20, pal('#CFC9BC'));
+    box3(x-1.05, y-0.14, 0.14, 0.07, 1.86, 0.11, pal('#2A2A30'));
+    box3(x-1.28, y-0.10, 0.13, 0.09, 2.18, 0.14, pal('#CFC9BC'));
+    box3(x-0.82, y-0.10, 0.13, 0.09, 2.18, 0.14, pal('#CFC9BC'));
+    box3(x+1.05, y-0.09, 0.46, 0.10, 1.84, 0.40, pal('#B01C2E'));  /* rugnummerbal */
+    box3(x, y, 3.9, 0.20, 2.70, 0.14, pal('#111117'));
+    for(let i=-3;i<=3;i++) box3(x+i*0.52, y+0.02, 0.30, 0.10, 2.84, 0.18, pal(i%2?'#B01C2E':'#111117'));
+  }
+  else if(kind==='watertower'){          /* watertoren met plaatsnaam */
+    for(let s=-1;s<=1;s+=2) for(let t2=-1;t2<=1;t2+=2)
+      box3(x+s*0.62, y+t2*0.55, 0.16, 0.16, 0, 2.05, pal('#B8BCC4'));
+    box3(x, y, 1.5, 1.4, 1.05, 0.12, pal('#A8ACB4'));
+    box3(x, y, 1.9, 1.75, 2.05, 0.22, pal('#DCE4EA'));             /* tank */
+    box3(x, y, 2.15, 2.00, 2.27, 0.85, pal('#EAF0F4'));
+    box3(x, y, 1.9, 1.75, 3.12, 0.24, pal('#DCE4EA'));
+    box3(x, y, 0.9, 0.85, 3.36, 0.34, pal('#CBD4DA'));
+    box3(x, y, 0.12, 0.12, 3.70, 0.34, pal('#B8BCC4'));
+    box3(x, y-0.30, 0.20, 0.14, 4.04, 0.16, pal('#B01C2E'));
+    say(x, y-1.02, 2.70, 'AUGUSTA', 1);
+    box3(x, y-1.00, 1.55, 0.06, 2.52, 0.36, pal('#2E6B8E'));
+  }
+  else if(kind==='diner'){               /* zilveren wegrestaurant met neonbord */
+    box3(x-0.5, y, 2.9, 1.45, 0, 1.10, pal('#D4DAE0'));
+    for(let i=-3;i<=3;i++) boxSides(x-0.5+i*0.42, y-0.74, 0.20, 0.03, 0, 1.10, pal('#BFC6CE'));
+    box3(x-0.5, y, 3.05, 1.60, 1.10, 0.16, pal('#C8302E'));
+    box3(x-0.5, y, 2.9, 1.45, 1.26, 0.10, pal('#EDF1F4'));
+    win(-1.4,-0.78, 0.52, 0.52, 0.50); win(-0.4,-0.78, 0.52, 0.52, 0.50);
+    win(0.6,-0.78, 0.52, 0.52, 0.50);
+    box3(x-1.4, y-0.78, 0.50, 0.06, 0, 0.76, DOOR);
+    box3(x+1.75, y, 0.24, 0.24, 0, 1.70, pal('#C8C8D0'));
+    box3(x+1.75, y, 1.35, 0.12, 1.70, 0.55, pal('#1E4C6E'));
+    say(x+1.75, y-0.07, 1.97, 'DINER', 1);
+    box3(x+1.75, y, 1.45, 0.16, 2.25, 0.10, pal('#F2C21C'));
   }
   else if(kind==='baroque'){             /* Grote Kerk Nijkerk: witte barokke toren */
     box3(x+0.95, y, 2.0, 1.30, 0, 1.15, pal('#C8BAA0'));
@@ -1550,6 +1714,17 @@ function drawVeh(r,v,y){
   ctx.globalAlpha=0.15;
   flat(x-v.len/2+0.10, x+v.len/2+0.10, y-0.30, y+0.50, 0.004, '#101820');
   ctx.globalAlpha=1;
+  if(v.bus){                                  /* gele Amerikaanse schoolbus */
+    const B=pal('#F2B713');
+    box3(x, y, v.len, 0.88, 0, 0.86, B);
+    box3(x, y, v.len-0.20, 0.92, 0.86, 0.10, pal('#E0A70F'));
+    boxSides(x, y-0.45, v.len-0.35, 0.03, 0.42, 0.30, pal('#2A3440'));   /* ramen */
+    boxSides(x, y-0.45, v.len, 0.03, 0.16, 0.10, pal('#2A2A32'));        /* zwarte bies */
+    box3(x - r.dir*(v.len/2-0.18), y, 0.30, 0.88, 0, 0.60, pal('#E8AE10'));
+    box3(x + r.dir*(v.len/2+0.02), y, 0.10, 0.66, 0.10, 0.16, pal('#F2F2F6'));
+    box3(x - r.dir*(v.len/2-0.10), y, 0.14, 0.30, 0.96, 0.10, pal('#D8342C'));
+    return;
+  }
   if(v.truck){
     box3(x-r.dir*0.42, y, v.len-0.85, 0.84, 0, 0.66, C.white);
     box3(x+r.dir*(v.len/2-0.42), y, 0.84, 0.84, 0, 0.52, p);
@@ -1565,7 +1740,25 @@ function drawLog(r,i,y){
 }
 /* NS-trein: gele bak met blauwe band en donkerblauwe ramenstrook */
 const NS_GEEL=pal('#F5C51C'), NS_BLAUW=pal('#1B4EA0'), NS_DONKER=pal('#16305E');
+/* Amerikaanse goederentrein: zwarte loc met gele neus en gekleurde containerwagons */
+const FRE=['#B4462E','#2E6B8E','#3E7A46','#8E6A2E','#6E4A7A'];
+function drawFreight(r,y){
+  const x=r.trainX, d=r.dir, L=TRAINLEN;
+  const lx = x + d*(L/2-1.15);
+  box3(lx, y, 2.3, 0.98, 0.04, 1.10, pal('#2A2A30'));              /* loc */
+  box3(lx, y, 2.4, 1.02, 0.04, 0.22, pal('#F2C21C'));
+  box3(lx - d*0.35, y, 1.2, 0.86, 1.14, 0.34, pal('#3A3A42'));     /* cabine */
+  boxSides(lx - d*0.35, y-0.44, 0.90, 0.03, 1.22, 0.20, pal('#1C242E'));
+  box3(x + d*(L/2+0.06), y, 0.14, 0.62, 0.34, 0.20, pal('#F6F6E8'));
+  for(let i=0;i<3;i++){                                            /* wagons */
+    const wx = x - d*(0.35 + i*1.95);
+    box3(wx, y, 1.75, 0.92, 0.04, 0.26, pal('#33333A'));
+    box3(wx, y, 1.70, 0.86, 0.30, 0.78, pal(FRE[i%FRE.length]));
+    boxSides(wx, y-0.44, 1.45, 0.03, 0.42, 0.52, pal(sh(FRE[i%FRE.length],0.82)));
+  }
+}
 function drawTrain(r,y){
+  if(scenario===1) return drawFreight(r,y);
   const x=r.trainX, d=r.dir, L=TRAINLEN;
   /* gele bak; het dak is óók geel met een blauwe streep erover, want van bovenaf
      zie je vooral het dak — daar moet het geel-blauw dus vandaan komen */
@@ -1852,9 +2045,20 @@ function refreshPick(){
   else { pickHead.textContent=CHARS[sel[0]].n+'  vs  '+CHARS[sel[1]].n; pickHead.style.color='#fff'; }
   startBtn.disabled = picking<2;
 }
+/* wereldkeuze; Amerika verschijnt pas nadat je samen rij 100 hebt gehaald */
+function setScenario(s){
+  scenario = (s===1 && usaUnlocked) ? 1 : 0;
+  ZONES = scenario ? ZONES_US : ZONES_NL;
+  const w=$('world'), b=w&&w.children;
+  if(b) for(let i=0;i<b.length;i++) b[i].className = 'wbtn' + (i===scenario?' on':'');
+  bgm.playbackRate = SC().muziek;
+  try{ bgm.preservesPitch=false; bgm.webkitPreservesPitch=false; }catch(e){}
+}
 function openPicker(){
   if(!cards.length) buildGrid();
   clearSel();
+  $('world').className = usaUnlocked ? '' : 'hide';
+  setScenario(scenario);
   wins=[0,0]; lastW='';               // nieuwe match, nieuwe rondestand
   menu.classList.add('hide'); endScr.classList.add('hide'); pickScr.classList.remove('hide');
   gs='menu';
@@ -1948,6 +2152,8 @@ function bestRegel(nieuw){
 function winTogether(){
   gs='over';
   wins[0]++; wins[1]++;
+  const eerst = !usaUnlocked;
+  usaUnlocked = true;                 /* Amerika verdiend */
   endTitle.textContent='Samen gewonnen!';
   const lift = p1.rescues+p2.rescues;
   endSub.textContent = p1.name+' en '+p2.name+' haalden samen het eind van de weg — '
@@ -1956,8 +2162,11 @@ function winTogether(){
       : stage>=3 ? 'Met de hele kinderschare erbij. '
       : stage>=2 ? 'Als getrouwd stel. ' : '')
     + (lift ? 'De ooievaar moest '+lift+'x bijspringen.' : 'Zonder hulp van de ooievaar.')
-    + bestRegel(noteBest());
+    + bestRegel(noteBest())
+    + (eerst ? ' AMERIKA ONTGRENDELD — kies hem bij Ander personage.'
+             : scenario===1 ? '' : ' Amerika staat klaar bij Ander personage.');
   sfxWin(); hud();
+  meldRonde(true);
   endScr.classList.remove('hide');
   if(navigator.vibrate) try{navigator.vibrate([60,50,60,50,120]);}catch(e){}
 }
@@ -1985,19 +2194,110 @@ function finish(){
     sfxWin();
   }
   hud();
+  meldRonde(false);
   endScr.classList.remove('hide');
   if(navigator.vibrate) try{navigator.vibrate(80);}catch(e){}
 }
 
+/* terug naar het beginscherm, waar je ook bent */
+function goHome(){
+  gs='menu'; countT=0;
+  countEl.className='pix'; countEl.textContent='';
+  bannerT=0; banner.style.opacity=0;
+  townT=0;   townEl.style.opacity=0;
+  pickScr.classList.add('hide');
+  endScr.classList.add('hide');
+  $('lb').classList.add('hide');
+  menu.classList.remove('hide');
+  resetRound();                      /* wereld draait weer als achtergrond */
+  lastS1=lastS2=-1; lastW=''; lastB1=lastB2='x';
+  n1.textContent='Speler 1'; n2.textContent='Speler 2';
+  hud();
+}
+
 function start(){
   resetRound();
+  bgm.playbackRate = SC().muziek;
   musicOn();
+  if(scenario===1){ townTxt.textContent='Welcome to Georgia'; townT=2.8; curZone=-1; }
   lastS1=lastS2=-1; lastW=''; lastB1=lastB2='x';
   n1.textContent=p1.name; n2.textContent=p2.name;
   hud();
   menu.classList.add('hide'); pickScr.classList.add('hide'); endScr.classList.add('hide');
   countT=3; gs='count';
   tone(440,0.05,'square',0.03);
+}
+
+/* ---------- ranglijst -------------------------------------------------------------
+   Versturen gaat als platte tekst, dan doet de browser geen CORS-voorvraag.
+   Ophalen gaat via een callback-scriptje, dat werkt zonder CORS-instellingen. */
+let lbBezig=false;
+function stuurUitslag(p, fin){
+  if(!SCORE_URL || !p) return;
+  try{
+    fetch(SCORE_URL, {method:'POST', mode:'no-cors', keepalive:true,
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body: JSON.stringify({naam:p.ch.n, rij:p.score, finish:fin?1:0, wereld:SC().naam})
+    }).catch(function(){});
+  }catch(e){}
+}
+function meldRonde(fin){
+  if(!SCORE_URL || !p1 || !p2) return;
+  stuurUitslag(p1, fin); stuurUitslag(p2, fin);
+}
+function haalRanglijst(klaar){
+  if(!SCORE_URL){ klaar(null,'geen'); return; }
+  const fn='lbCb'+Math.floor(Math.random()*1e6);
+  const s=document.createElement('script');
+  let af=false;
+  function op(){ if(af) return; af=true;
+    try{ delete window[fn]; }catch(e){ window[fn]=undefined; }
+    if(s.parentNode) s.parentNode.removeChild(s); }
+  window[fn]=function(d){ op(); klaar(d && d.lijst ? d.lijst : [], null); };
+  s.onerror=function(){ op(); klaar(null,'fout'); };
+  setTimeout(function(){ if(!af){ op(); klaar(null,'traag'); } }, 9000);
+  s.src = SCORE_URL + (SCORE_URL.indexOf('?')<0?'?':'&') + 'callback='+fn+'&t='+Date.now();
+  document.body.appendChild(s);
+}
+function toonRanglijst(){
+  pickScr.classList.add('hide'); endScr.classList.add('hide'); menu.classList.add('hide');
+  $('lb').classList.remove('hide');
+  const box=$('lbBox');
+  if(lbBezig) return;
+  lbBezig=true;
+  box.innerHTML='<div id="lbMsg">Laden…</div>';
+  haalRanglijst(function(lijst, fout){
+    lbBezig=false;
+    if(fout==='geen'){
+      box.innerHTML='<div id="lbMsg">Er is nog geen ranglijst ingesteld.<br><br>'
+        + 'Zet het bestand leaderboard-appsscript.gs in een Google Spreadsheet, '
+        + 'publiceer het als web-app en plak de URL bovenin index.html bij SCORE_URL.</div>';
+      return;
+    }
+    if(!lijst){
+      box.innerHTML='<div id="lbMsg">De ranglijst is even niet bereikbaar. '
+        + 'Controleer je internet, of of de web-app op “Iedereen” staat.</div>';
+      return;
+    }
+    if(!lijst.length){
+      box.innerHTML='<div id="lbMsg">Nog geen potjes gespeeld. Wees de eerste!</div>';
+      return;
+    }
+    let h='<table class="lb"><tr><th></th><th>Personage</th><th>Totaal</th>'
+        + '<th>Beste</th><th>Potjes</th><th>Finish</th></tr>';
+    for(let i=0;i<lijst.length;i++){
+      const r=lijst[i];
+      h+='<tr'+(i<3?' class="top"':'')+'><td>'+(i+1)+'</td><td>'+esc(r.naam)+'</td>'
+       + '<td class="tot">'+(r.totaal|0)+'</td><td>'+(r.beste|0)+'</td>'
+       + '<td>'+(r.potjes|0)+'</td><td>'+(r.finishes|0)+'</td></tr>';
+    }
+    box.innerHTML = h+'</table>';
+  });
+}
+function esc(s){
+  return String(s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
 }
 
 /* ---------- achtergrondmuziek ------------------------------------------------------ */
@@ -2053,6 +2353,7 @@ wrap.addEventListener('mousedown', e=>{
 const KEYS={KeyW:[1,0],KeyS:[1,1],KeyA:[1,2],KeyD:[1,3],
             ArrowUp:[2,0],ArrowDown:[2,1],ArrowLeft:[2,2],ArrowRight:[2,3]};
 addEventListener('keydown', e=>{
+  if(e.code==='Escape'){ goHome(); e.preventDefault(); return; }
   if(e.code==='Enter'||e.code==='Space'){
     if(gs==='over'){ start(); e.preventDefault(); }
     else if(gs==='menu' && picking===2){ start(); e.preventDefault(); }
@@ -2065,9 +2366,21 @@ addEventListener('keydown', e=>{
 
 $('toPick').addEventListener('click', openPicker);
 $('clearSel').addEventListener('click', clearSel);
+(function(){
+  const w=$('world'), b=w&&w.children;
+  if(!b) return;
+  for(let i=0;i<b.length;i++) if(b[i].addEventListener)
+    b[i].addEventListener('click', function(){ setScenario(+this.getAttribute('data-s')); sfxPick(); });
+})();
 startBtn.addEventListener('click', ()=>{ if(picking===2) start(); });
 $('again').addEventListener('click', start);
 $('swap').addEventListener('click', openPicker);
+$('home').addEventListener('click', goHome);
+$('homePick').addEventListener('click', goHome);
+$('homeEnd').addEventListener('click', goHome);
+$('toLb').addEventListener('click', toonRanglijst);
+$('lbEnd').addEventListener('click', toonRanglijst);
+$('lbClose').addEventListener('click', goHome);
 /* op het eindscherm start een tik waar dan ook meteen een nieuw potje */
 endScr.addEventListener('click', e=>{
   if(gs==='over' && e.target.tagName!=='BUTTON') start();
