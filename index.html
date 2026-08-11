@@ -99,6 +99,12 @@
     padding:7px 10px;font-size:13px;font-weight:800;font-family:inherit;outline:none}
   #teamIn::placeholder{color:rgba(255,255,255,.38);font-weight:600}
   #teamIn:focus{border-color:#F5D33C}
+  /* nog geen teamnaam? dan valt het vakje zachtjes op, want zonder naam
+     komt het potje niet in de teamranglijst */
+  #teamIn.leeg{border-color:rgba(245,211,60,.55);background:rgba(245,211,60,.10)}
+  #teamHint{font-size:9.5px;font-weight:800;color:#F5D33C;text-shadow:1px 1px 0 #000;
+    letter-spacing:.03em;margin-top:-4px;max-width:330px;text-align:left;width:100%}
+  #teamHint.hide{display:none}
 
   /* winkel */
   #uitd{display:flex;flex-direction:column;gap:4px;width:100%;max-width:320px;
@@ -132,14 +138,25 @@
   .gcard canvas{width:100%;height:auto;max-width:58px;display:block}
   .gcard .gn{font-size:10.5px;font-weight:900;color:#fff;text-shadow:1px 1px 0 #000;
     text-align:center;line-height:1.15}
-  .gcard button{pointer-events:auto;width:100%;background:#F5D33C;color:#3A2A00;border:2px solid #000;
-    border-radius:6px;padding:5px 4px;font-size:11px;font-weight:900;font-family:inherit;
-    cursor:pointer;letter-spacing:.03em}
-  .gcard button[disabled]{background:rgba(255,255,255,.14);color:rgba(255,255,255,.45);
+  .gcard button.koop{pointer-events:auto;width:100%;background:#F5D33C;color:#3A2A00;
+    border:2px solid #000;border-radius:6px;padding:5px 4px;font-size:11px;font-weight:900;
+    font-family:inherit;cursor:pointer;letter-spacing:.03em}
+  .gcard button.koop[disabled]{background:rgba(255,255,255,.14);color:rgba(255,255,255,.45);
     border-color:rgba(255,255,255,.18)}
-  .gcard select{pointer-events:auto;width:100%;background:rgba(0,0,0,.42);color:#fff;
-    border:2px solid rgba(255,255,255,.28);border-radius:6px;padding:4px 3px;
-    font-size:10.5px;font-weight:800;font-family:inherit}
+
+  /* wie draagt hem: pijltje, naam, pijltje */
+  .kies{display:flex;align-items:stretch;gap:3px;width:100%}
+  .kies .pijl{pointer-events:auto;flex:0 0 26px;background:rgba(0,0,0,.40);color:#F5D33C;
+    border:2px solid rgba(245,211,60,.42);border-radius:6px;padding:0;
+    font-size:15px;font-weight:900;font-family:inherit;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent}
+  .kies .pijl:active{background:#F5D33C;color:#3A2A00;transform:translateY(1px)}
+  .kies .wie{flex:1 1 auto;min-width:0;background:rgba(0,0,0,.40);
+    border:2px solid rgba(255,255,255,.20);border-radius:6px;padding:5px 2px;
+    font-size:10.5px;font-weight:900;color:#fff;text-align:center;line-height:1.15;
+    display:flex;align-items:center;justify-content:center;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .kies .wie.geen{color:rgba(255,255,255,.42);font-weight:700;font-style:italic}
 
   /* tabbladen in de ranglijst */
   #lbTabs{display:flex;gap:8px}
@@ -202,7 +219,13 @@
 
   /* ranglijst */
   #lbSub{font-size:11.5px;color:#CFE3BE;font-weight:700;text-shadow:1px 1px 0 #000;
-    letter-spacing:.04em;margin-top:-6px}
+    letter-spacing:.04em;margin-top:-6px;max-width:24em;line-height:1.5}
+  #lbSub .waarsch{color:#FFC24A;font-weight:900}
+  #lbMsg b{color:#F5D33C}
+  #lbMsg i{color:#CFE3BE;font-style:normal;font-weight:900}
+  .lbvoet{font-size:10px;font-weight:700;color:#BFD8AC;text-shadow:1px 1px 0 #000;
+    padding:8px 3px 0;line-height:1.5}
+  .lbvoet.dun{color:rgba(255,255,255,.34);font-size:9px;padding-top:5px}
   #lbBox{width:100%;max-width:360px;max-height:56vh;overflow-y:auto;touch-action:pan-y;
     background:rgba(0,0,0,.30);border:3px solid rgba(255,255,255,.18);border-radius:9px;padding:6px}
   #lbMsg{color:#fff;font-size:12.5px;font-weight:700;padding:14px 8px;line-height:1.5;
@@ -288,6 +311,7 @@
       <input id="teamIn" type="text" maxlength="18" autocomplete="off"
              spellcheck="false" placeholder="bijv. Huize Hoevelaken">
     </div>
+    <div id="teamHint">Vul een teamnaam in, anders telt dit potje niet mee in de teamranglijst.</div>
     <div id="world" class="hide">
       <button class="wbtn on" data-s="0"><span class="flag nl"></span>Nederland</button>
       <button class="wbtn"    data-s="1"><span class="flag us"></span>Amerika</button>
@@ -2929,6 +2953,13 @@ function zetTeam(v){
   team = String(v||'').trim().slice(0,18);
   try{ localStorage.setItem('cc_team', team); }catch(e){}
 }
+/* het vakje licht op zolang er geen teamnaam staat */
+function teamVeld(){
+  const inp=$('teamIn'), hint=$('teamHint');
+  if(!inp) return;
+  if(team){ inp.classList.remove('leeg'); if(hint) hint.classList.add('hide'); }
+  else    { inp.classList.add('leeg');    if(hint) hint.classList.remove('hide'); }
+}
 function stuurUitslag(p, fin, sec){
   if(!SCORE_URL || !p) return;
   try{
@@ -2964,16 +2995,41 @@ function tijdKort(s){
   const m=Math.floor(s/60), r=s%60;
   return m ? m+':'+(r<10?'0':'')+r : r+'s';
 }
+/* Het teamtabblad kan om drie redenen leeg zijn. Dit zegt welke het is,
+   in plaats van alleen "nog geen teams". */
+const SCRIPT_VERSIE = 2;                 /* hoort bij leaderboard-appsscript.gs */
+function teamUitleg(){
+  const v = lbData && lbData.versie || 0;
+  if(v < SCRIPT_VERSIE){
+    return '<b>Het script in je Google Spreadsheet is nog de oude versie.</b><br><br>'
+     + 'Die slaat de teamnaam en de tijd niet op, dus dit tabblad blijft leeg. '
+     + 'Zo werk je hem bij:<br><br>'
+     + '1. Open je spreadsheet &rarr; Extensies &rarr; Apps Script<br>'
+     + '2. Wis alles en plak <i>leaderboard-appsscript.gs</i> er opnieuw in, opslaan<br>'
+     + '3. Implementeren &rarr; Implementatie beheren &rarr; potloodje &rarr; '
+     + 'Versie: <i>Nieuwe versie</i> &rarr; Implementeren<br><br>'
+     + 'De link blijft hetzelfde. Potjes die je daarna speelt komen hier te staan.';
+  }
+  const d = lbData && lbData.diag;
+  if(d && d.regels && !d.metTeam){
+    return 'Er staan al ' + d.regels + ' uitslagen in, maar nog zonder teamnaam.<br><br>'
+     + 'Vul op het keuzescherm bij <b>Team</b> een naam in voordat je start. '
+     + 'Hij wordt onthouden, dus dat hoeft maar één keer.';
+  }
+  return 'Nog geen teams. Vul een teamnaam in op het keuzescherm en speel een potje.';
+}
 function tekenTabel(){
   const box=$('lbBox');
   const teams = lbTab===1;
   const rij = teams ? (lbData.teams||[]) : (lbData.lijst||[]);
-  $('lbSub').textContent = teams
-    ? 'per team, beide spelers bij elkaar opgeteld'
-    : 'per personage, alle potjes bij elkaar opgeteld';
+  const oud = (lbData && lbData.versie || 0) < SCRIPT_VERSIE;
+  $('lbSub').innerHTML = (teams
+      ? 'per team, beide spelers bij elkaar opgeteld'
+      : 'per personage, alle potjes bij elkaar opgeteld')
+    + (oud ? '<br><b class="waarsch">Let op: het script in je spreadsheet is nog de '
+             + 'oude versie, dus Team en Snelst blijven leeg.</b>' : '');
   if(!rij.length){
-    box.innerHTML='<div id="lbMsg">'+(teams
-      ? 'Nog geen teams. Vul een teamnaam in op het keuzescherm en speel een potje.'
+    box.innerHTML='<div id="lbMsg">'+(teams ? teamUitleg()
       : 'Nog geen potjes gespeeld. Wees de eerste!')+'</div>';
     return;
   }
@@ -2986,49 +3042,86 @@ function tekenTabel(){
      + '<td>'+(r.potjes|0)+'</td><td>'+(r.finishes|0)+'</td>'
      + '<td>'+tijdKort(r.snelste)+'</td></tr>';
   }
-  box.innerHTML = h+'</table>';
+  h+='</table>';
+  /* Snelst vult zich pas als iemand rij 100 haalt; anders is een snelle tijd
+     alleen maar een snelle dood. Zeg dat er dan even bij. */
+  const geenTijd = rij.every(function(r){ return !(r.snelste>0); });
+  if(geenTijd && !oud)
+    h+='<div class="lbvoet">Snelst telt alleen potjes waarin jullie samen rij 100 '
+      +'haalden. Zodra dat lukt staat de tijd hier.</div>';
+  const d = lbData && lbData.diag;
+  if(d) h+='<div class="lbvoet dun">script v'+(lbData.versie||1)+' · '+d.regels
+        +' uitslagen · '+d.metTeam+' met teamnaam</div>';
+  box.innerHTML = h;
 }
 /* ---------- winkel ------------------------------------------------------------ */
+/* wie draagt deze gadget? -1 betekent niemand */
+function drager(id){
+  for(let j=0;j<CHARS.length;j++) if(gadgets[CHARS[j].n]===id) return j;
+  return -1;
+}
+/* Eén kaartje in de winkel. Heb je de gadget nog niet, dan zie je de prijs;
+   heb je hem wel, dan blader je met twee pijltjes langs de personages en
+   staat de naam ertussenin. Dat tikt op een telefoon prettiger weg dan een
+   uitklaplijstje, en het poppetje in het voorbeeld verandert meteen mee. */
+function maakKaart(g){
+  const kaart=document.createElement('div');
+  kaart.className='gcard'+(bezit[g.id]?' have':'');
+  const cvp=document.createElement('canvas'); cvp.width=54; cvp.height=64;
+  const nm=document.createElement('div'); nm.className='gn'; nm.textContent=g.n;
+  kaart.appendChild(cvp); kaart.appendChild(nm);
+
+  if(!bezit[g.id]){
+    renderPreview(cvp, CHARS[7], g.id);          /* Leendert als paspop */
+    const b=document.createElement('button');
+    b.className='koop';
+    b.textContent = g.p+' munten';
+    b.disabled = munten < g.p;
+    b.addEventListener('click', function(){
+      if(munten < g.p) return;
+      munten -= g.p; bezit[g.id]=true;
+      /* meteen aan wie er nog niks draagt, dan zie je direct resultaat */
+      const vrij = CHARS.findIndex(function(c){ return !gadgets[c.n]; });
+      if(vrij>=0) gadgets[CHARS[vrij].n]=g.id;
+      sfxKoop(); bewaarSpul(); hud(); bouwWinkel(); buildGrid(); refreshPick();
+    });
+    kaart.appendChild(b);
+    return kaart;
+  }
+
+  const rij=document.createElement('div'); rij.className='kies';
+  const links =document.createElement('button'); links.className='pijl';
+  const naamEl=document.createElement('div');    naamEl.className='wie';
+  const rechts=document.createElement('button'); rechts.className='pijl';
+  links.textContent='‹'; rechts.textContent='›';
+  links.setAttribute('aria-label','vorige');  rechts.setAttribute('aria-label','volgende');
+  rij.appendChild(links); rij.appendChild(naamEl); rij.appendChild(rechts);
+  kaart.appendChild(rij);
+
+  function toon(){
+    const j=drager(g.id);
+    naamEl.textContent = j<0 ? 'niemand' : CHARS[j].n;
+    naamEl.className   = 'wie'+(j<0?' geen':'');
+    /* draagt niemand hem, dan staat Leendert model — de gadget blijft zichtbaar */
+    renderPreview(cvp, CHARS[j<0?7:j], g.id);
+  }
+  function schuif(d){
+    /* het rondje loopt van "niemand" via alle personages weer terug */
+    const n=CHARS.length+1;
+    const j=(((drager(g.id)+1) + d) % n + n) % n - 1;
+    for(const k in gadgets) if(gadgets[k]===g.id) delete gadgets[k];
+    if(j>=0) gadgets[CHARS[j].n]=g.id;
+    sfxPick(); bewaarSpul(); toon(); buildGrid(); refreshPick();
+  }
+  links .addEventListener('click', function(){ schuif(-1); });
+  rechts.addEventListener('click', function(){ schuif( 1); });
+  toon();
+  return kaart;
+}
 function bouwWinkel(){
   const box=$('shopBox');
   box.innerHTML='';
-  for(let i=0;i<GADGETS.length;i++){
-    const g=GADGETS[i];
-    const kaart=document.createElement('div');
-    kaart.className='gcard'+(bezit[g.id]?' have':'');
-    const cvp=document.createElement('canvas'); cvp.width=54; cvp.height=64;
-    const nm=document.createElement('div'); nm.className='gn'; nm.textContent=g.n;
-    kaart.appendChild(cvp); kaart.appendChild(nm);
-    if(bezit[g.id]){
-      const sel=document.createElement('select');
-      let opt=document.createElement('option'); opt.value=''; opt.textContent='draagt niemand';
-      sel.appendChild(opt);
-      for(let j=0;j<CHARS.length;j++){
-        const o=document.createElement('option');
-        o.value=CHARS[j].n; o.textContent=CHARS[j].n;
-        if(gadgets[CHARS[j].n]===g.id) o.selected=true;
-        sel.appendChild(o);
-      }
-      sel.addEventListener('change', function(){
-        for(const k in gadgets) if(gadgets[k]===g.id) delete gadgets[k];
-        if(this.value) gadgets[this.value]=g.id;
-        sfxPick(); bewaarSpul(); bouwWinkel(); buildGrid(); refreshPick();
-      });
-      kaart.appendChild(sel);
-    }else{
-      const b=document.createElement('button');
-      b.textContent = g.p+' munten';
-      b.disabled = munten < g.p;
-      b.addEventListener('click', function(){
-        if(munten < g.p) return;
-        munten -= g.p; bezit[g.id]=true;
-        sfxKoop(); bewaarSpul(); hud(); bouwWinkel();
-      });
-      kaart.appendChild(b);
-    }
-    box.appendChild(kaart);
-    renderPreview(cvp, CHARS[7], g.id);      /* Leendert als paspop */
-  }
+  for(let i=0;i<GADGETS.length;i++) box.appendChild(maakKaart(GADGETS[i]));
   $('shopSub').textContent = 'Je hebt '+munten+' munten. Elke rij levert er één op, '
     + 'en de drie doelen per potje geven een bonus. Wat je koopt blijft bewaard, '
     + 'ook als je het spel later weer opent.';
@@ -3170,7 +3263,9 @@ $('tabTeam').addEventListener('click', function(){ zetTab(1); });
   const inp=$('teamIn');
   if(!inp) return;
   inp.value = team;
-  inp.addEventListener('input', function(){ zetTeam(this.value); });
+  inp.addEventListener('input', function(){ zetTeam(this.value); teamVeld(); });
+  inp.addEventListener('change', function(){ zetTeam(this.value); teamVeld(); });
+  teamVeld();
 })();
 /* op het eindscherm start een tik waar dan ook meteen een nieuw potje */
 endScr.addEventListener('click', e=>{
