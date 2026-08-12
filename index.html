@@ -588,7 +588,10 @@ function drawFigure(x, y, z, sq, ch, gad){
   if(ch.penguin){
     const wq=1/Math.sqrt(sq), pt=z+0.06+0.62*sq+0.36*sq;
     gadgetAchter(gad, x, y, 0.50*wq, 0.46*wq, pt, z+0.06, 0.62*sq);
-    drawPenguin(x,y,z,sq,ch);
+    /* de pinguïn heeft geen beentjes, dus die krijgt de wieltjes
+       rechtstreeks onder zijn oranje pootjes geschroefd */
+    if(gad==='rolschaats') rolschaatsen(x, y, z, 0.15, -0.16, true);
+    drawPenguin(x, y, z + (gad==='rolschaats'?0.085:0), sq, ch);
     tekenGadget(gad, x, y, 0.50*wq, 0.46*wq, pt, z+0.06, 0.62*sq, y-0.46*wq/2-0.015);
     if(SC().nacht) helmlamp(x, y, 0.46*wq, 0.50*wq, pt);
     if(ch.old) rollator(x,y);
@@ -600,13 +603,15 @@ function drawFigure(x, y, z, sq, ch, gad){
 
   const TL = ch.tall || 1;              /* Roelof steekt er bovenuit */
 
-  /* cape en vleugels horen achter het poppetje, dus die gaan er als eerste op */
-  if(gad==='cape'||gad==='vleugels')
+  /* de cape hoort achter het poppetje, dus die gaat er als eerste op */
+  if(gad==='cape')
     gadgetAchter(gad, x, y, 0.52*wq, 0.38*wq, 0, z+0.20*TL, 0.44*sq*TL);
 
-  /* benen */
-  box3(x-0.12, y+0.02, 0.15, 0.20, z, 0.22*TL, pt);
-  box3(x+0.12, y+0.02, 0.15, 0.20, z, 0.22*TL, pt);
+  /* benen — met rolschaatsen staan ze een stukje hoger op hun wieltjes */
+  const rol = gad==='rolschaats' ? 0.16 : 0;
+  box3(x-0.12, y+0.02, 0.15, 0.20, z+rol, 0.22*TL, pt);
+  box3(x+0.12, y+0.02, 0.15, 0.20, z+rol, 0.22*TL, pt);
+  if(rol) rolschaatsen(x, y, z);
 
   /* romp, armen en handen (achterste arm eerst voor de juiste overlap) */
   const tz=z+0.22*TL, tw=0.52*wq, td=0.38*wq, th=0.44*sq*TL;
@@ -751,7 +756,7 @@ const GADGETS=[
   {id:'muts',     n:'Feestmuts',     p:110},
   {id:'cape',     n:'Superheldencape',p:150},
   {id:'kroon',    n:'Gouden kroon',  p:190},
-  {id:'vleugels', n:'Vleugeltjes',   p:240},
+  {id:'rolschaats',n:'Rolschaatsen', p:240},
   {id:'ster',     n:'Sterrenkrans',  p:300}
 ];
 let gadgets={};      /* {personagenaam: gadget-id} — wie draagt wat */
@@ -782,9 +787,29 @@ function laadSpul(){
   }catch(e){}
 }
 
-/* Gadgets die achter het poppetje horen (de cape, de vleugels) moeten vóór
-   het lichaam getekend worden, anders schilderen ze over het gezicht heen.
-   Deze functie doet dat deel; tekenGadget doet de rest. */
+/* De cape hoort achter het poppetje en moet dus vóór het lichaam getekend
+   worden, anders schildert hij over het gezicht heen. Deze functie doet dat
+   deel; tekenGadget doet de rest. */
+/* Rolschaatsen onder de voeten: een witte schoen met vier gele wieltjes
+   eronder. Ze worden apart getekend, meteen na de beentjes, omdat ze
+   op de grond horen en niet op het hoofd. */
+function rolschaatsen(x, y, z, sx, oy, plat){
+  const w=Math.sin(T*6)*0.010;                    /* de wieltjes wiebelen mee */
+  const pz = plat ? 0.048 : 0.078;                /* de pinguïn krijgt alleen wieltjes */
+  for(let s=-1;s<=1;s+=2){
+    const bx=x+s*(sx||0.125), by=y+(oy===undefined?-0.02:oy);
+    if(!plat){                                    /* witte laars met rood boordje */
+      box3(bx, by, 0.21, 0.27, z+0.105, 0.115, pal('#FAFAFE'));
+      box3(bx, by, 0.215,0.275,z+0.205, 0.035, pal('#E24A6B'));
+    }
+    /* onderplaat en twee wieltjes, voor en achter */
+    box3(bx, by, 0.22, 0.28, z+pz, 0.030, pal('#C9C9D6'));
+    for(let k=-1;k<=1;k+=2){
+      box3(bx, by+k*0.085, 0.17, 0.085, z+0.005+w, 0.055, pal('#F5C21E'));
+      box3(bx, by+k*0.085, 0.075,0.095, z+0.020+w, 0.026, pal('#8A6A0C'));   /* as */
+    }
+  }
+}
 function gadgetAchter(gad, x, y, hw, hd, top, tz, th){
   if(gad==='cape'){
     /* De lap hangt breder dan het lijf en loopt door tot over de beentjes,
@@ -797,14 +822,6 @@ function gadgetAchter(gad, x, y, hw, hd, top, tz, th){
            pal(i%2?'#B01A27':'#C8202E'));
     }
     box3(x, cy+0.02, hw*0.80, 0.07, cz-0.12, 0.13, pal('#8E1420'));   /* punt */
-  }else if(gad==='vleugels'){
-    const fl=Math.sin(T*7)*0.03;                     /* klappert zachtjes */
-    for(let s=-1;s<=1;s+=2){
-      const bx=x+s*(hw*0.46+0.07), by=y+hd*0.26;
-      box3(bx,          by,       0.11, 0.09, tz+th*0.42, 0.20, pal('#FFFFFF'));
-      box3(bx+s*0.10,   by+0.035, 0.10, 0.08, tz+th*0.56+fl, 0.19, pal('#F2F2F8'));
-      box3(bx+s*0.185,  by+0.065, 0.08, 0.07, tz+th*0.72+fl*1.6, 0.16, pal('#E2E2EC'));
-    }
   }
 }
 function tekenGadget(gad, x, y, hw, hd, top, tz, th, fy){
@@ -985,7 +1002,8 @@ function renderPreview(canvas, ch, gad){
   ctx = c2; c2.imageSmoothingEnabled = false;
   c2.clearRect(0,0,canvas.width,canvas.height);
   TILE = canvas.width/1.12; camSX = 0; camSY = 0;
-  oCX = canvas.width/2 - 2; oCY = canvas.height - 7;
+  /* rolschaatsen steken onder de voeten uit, dus dan iets hoger inzoomen */
+  oCX = canvas.width/2 - 2; oCY = canvas.height - (gad==='rolschaats' ? 12 : 7);
   ctx.globalAlpha = 0.16; flat(-0.42,0.42,-0.42,0.42, 0, '#000'); ctx.globalAlpha = 1;
   drawFigure(0, 0, 0, 1, ch, gad);
   ctx = sv.ctx; TILE = sv.TILE; oCX = sv.oCX; oCY = sv.oCY; camSX = sv.camSX; camSY = sv.camSY;
@@ -3181,13 +3199,25 @@ function fire(p,dir){
   else if(dir===2) tryHop(p,-1,0); else tryHop(p,1,0);
 }
 const touches=new Map();
+/* Begint een aanraking op een knop, dan is het geen sprong maar een klik.
+   Zonder deze uitzondering blokkeerde het preventDefault hieronder de klik,
+   en waren Klaar, Home, geluid en volledig scherm tijdens het spelen dood. */
+function opKnop(el){
+  for(let n=0; el && el!==wrap && n<12; el=el.parentNode, n++){
+    const tag = el.tagName;
+    if(tag==='BUTTON' || tag==='INPUT' || tag==='SELECT' || tag==='A') return true;
+  }
+  return false;
+}
 wrap.addEventListener('touchstart', e=>{
   const half=wrap.clientWidth/2;
+  let knop=false;
   for(let i=0;i<e.changedTouches.length;i++){
     const t=e.changedTouches[i];
+    if(opKnop(t.target)){ knop=true; continue; }   /* laat de browser klikken */
     touches.set(t.identifier,{sx:t.clientX,sy:t.clientY,who:t.clientX<half?1:2,moved:false});
   }
-  if(gs==='play'||gs==='count') e.preventDefault();
+  if((gs==='play'||gs==='count') && !knop) e.preventDefault();
 },{passive:false});
 wrap.addEventListener('touchmove', e=>{
   if(gs!=='play' && gs!=='count' && gs!=='dying') return;
@@ -3214,7 +3244,7 @@ function endTouch(e){
 wrap.addEventListener('touchend',endTouch,{passive:false});
 wrap.addEventListener('touchcancel',endTouch,{passive:false});
 wrap.addEventListener('mousedown', e=>{
-  if(gs!=='play') return;
+  if(gs!=='play' || opKnop(e.target)) return;
   fire(e.clientX < wrap.clientWidth/2 ? p1 : p2, 0);
 });
 const KEYS={KeyW:[1,0],KeyS:[1,1],KeyA:[1,2],KeyD:[1,3],
@@ -3253,7 +3283,23 @@ $('homeEnd').addEventListener('click', goHome);
 $('toLb').addEventListener('click', toonRanglijst);
 $('lbEnd').addEventListener('click', toonRanglijst);
 $('lbClose').addEventListener('click', goHome);
-$('doneBtn').addEventListener('click', function(){ if(finished) winTogether(); });
+/* Klaar met rondlopen. Deze knop moet het altijd doen, dus hij luistert ook
+   los naar touchend (op sommige telefoons komt er anders geen klik door) en
+   hij hangt niet af van de vlag 'finished': staat het feest aan, dan stopt
+   hij het, en anders is het gewoon de weg terug naar het menu. */
+let klaarBezig=false;
+function klaarMetFeest(e){
+  if(e){ e.preventDefault(); e.stopPropagation(); }
+  if(klaarBezig) return;
+  klaarBezig=true; setTimeout(function(){ klaarBezig=false; }, 400);
+  $('doneBtn').classList.add('hide');
+  if(gs==='play' || gs==='dying'){
+    if(finished || partyT>0) winTogether();
+    else goHome();
+  }
+}
+$('doneBtn').addEventListener('click', klaarMetFeest);
+$('doneBtn').addEventListener('touchend', klaarMetFeest, {passive:false});
 $('toShop').addEventListener('click', toonWinkel);
 $('shopEnd').addEventListener('click', toonWinkel);
 $('shopClose').addEventListener('click', goHome);
