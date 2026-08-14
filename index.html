@@ -252,6 +252,11 @@
   #doneBtn{position:absolute;left:50%;transform:translateX(-50%);
     bottom:calc(52px + env(safe-area-inset-bottom));z-index:9}
   #doneBtn.hide{display:none}
+  #doneHint{position:absolute;left:50%;transform:translateX(-50%);
+    bottom:calc(28px + env(safe-area-inset-bottom));z-index:9;pointer-events:none;
+    font-size:10.5px;font-weight:800;letter-spacing:.03em;color:#FFE9A8;
+    text-shadow:1px 1px 0 #000,0 0 6px rgba(0,0,0,.7);white-space:nowrap}
+  #doneHint.hide{display:none}
 
   #btns{position:absolute;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));display:flex;gap:6px}
   #btns button{pointer-events:auto;background:rgba(0,0,0,.42);color:#fff;border:0;
@@ -277,6 +282,7 @@
     <div id="town"><span></span></div>
     <div id="doelen"></div>
     <button class="btn hide" id="doneBtn">Klaar</button>
+    <div id="doneHint" class="hide"></div>
     <div id="btns">
       <button id="home" title="Terug naar het beginscherm">⌂</button>
       <button id="mute" title="Geluid">♪</button>
@@ -354,6 +360,7 @@
     <div id="endSub"></div>
     <div id="uitd"></div>
     <div class="row">
+      <button class="btn hide" id="verder">Verder</button>
       <button class="btn" id="again">Opnieuw</button>
       <button class="btn alt small" id="swap">Ander personage</button>
       <button class="btn alt small" id="lbEnd">Ranglijst</button>
@@ -399,6 +406,8 @@ const CFG = {
   finish      : 100,   /* eindpunt: kermisterrein, samen gewonnen */
   partyMax    : 150,   /* zoveel seconden mag je rondlopen op het eindterrein */
   doneNa      : 2.0,   /* na zoveel seconden verschijnt de Klaar-knop */
+  feestRijen  : 13,    /* hoe ver het eindterrein doorloopt */
+  poortRij    : 14,    /* daarachter de poort naar de volgende wereld */
   bikeChance  : 0.07,  /* kans op een fietspad */
   boatChance  : 0.30   /* kans dat er een zeilboot in een waterrij ligt */
 };
@@ -493,6 +502,8 @@ const C = {
   bushT:['#D2CFE4','#B0ADC2','#9995AC'],
   rock :['#A8AEB6','#8B9199','#767C84'],
   car  :['#F2F2F2','#37AEDE','#7FB93E','#E2564A','#F0C33C','#B77BE0','#FF8A3D'],
+  /* ingetogen lakkleuren voor de oldtimers, zodat die er meteen anders uitzien */
+  oud  :['#7B2E2E','#2C4A38','#28345A','#5E4B2A','#20202A','#6C6858','#8A6520'],
   train:['#C4413C','#9E322E','#832925'],
   white:['#F4F4F4','#DADADE','#C0C0C6']
 };
@@ -1152,6 +1163,9 @@ function genRow(y){
       else if(k===8) r.deco='tent';
       else if(k===11) r.deco='tent';
     }
+    /* helemaal achteraan de poort naar de volgende wereld — wie doorloopt
+       hoeft niet eerst via het eindscherm en het menu */
+    if(k===CFG.poortRij && volgendeWereld()>=0) r.deco='poort';
     rows.set(y,r); return r;
   }
   const zStep = y-ZONE_START;
@@ -1187,11 +1201,24 @@ function genRow(y){
     run.dir=-run.dir; r.dir=run.dir;
     r.speed=(1.3+d*2.0+rnd(0,0.7))*SC().snel; r.veh=[];
     let p=rnd(-13,13); const n=ri(2,3);
+    /* Wat voor verkeer er rijdt: schoolbussen alleen in Amerika, en verder een
+       mix van personenauto's, bestelbussen, vrachtwagens en af en toe een
+       oldtimer die statig voorbij komt. */
     for(let i=0;i<n;i++){
       const q=Math.random();
-      const bus = scenario===1 && q<0.20, truck = !bus && q<0.36;
+      const bus   = scenario===1 && q<0.18;
+      const truck = !bus && q<0.32;
+      const van   = !bus && !truck && q<0.44;
+      const old   = !bus && !truck && !van && q<0.60;
+      /* Alle personenauto's, bestelbussen en oldtimers houden exact dezelfde
+         lengte als voorheen. De lengte is namelijk ook de botsingsbreedte, en
+         uit 120 gesimuleerde potjes bleek dat zelfs een paar centimeter extra
+         de weg merkbaar lastiger maakt. Ze verschillen dus in hoogte, vorm en
+         detail — niet in lengte. */
       const len = bus?2.7 : truck?2.3 : 1.35;
-      r.veh.push({o:p, len, col: bus?'#F2B713':pick(C.car), truck, bus});
+      r.veh.push({o:p, len, truck, bus, van, old,
+                  hatch: !old && Math.random()<0.5,
+                  col: bus?'#F2B713' : old?pick(C.oud) : pick(C.car)});
       p += len + rnd(3.2,5.2) - d*0.4;
     }
     run.reach=allCols();          /* op wegen, water en spoor kun je overal staan */
@@ -1380,7 +1407,7 @@ function resetRound(){
   stage=0; bannerT=0; banner.style.opacity=0; deathOrder=0; ringT=0;
   curZone=0; townT=0; townEl.style.opacity=0;
   finished=false; partyT=0; nearShown=false; idleT=0; lastMileT=-99;
-  doneT=0; $('doneBtn').classList.add('hide'); kissT=0;
+  doneT=0; verbergKlaar(); kissT=0; afgerond=false;
   for(let i=0;i<HARTEN.length;i++) HARTEN[i].t=0;
   for(const p of P) p.life=0;
   p1 = mkPlayer(-1, CHARS[sel[0]!=null?sel[0]:0], '#2E8BE0');
@@ -1401,8 +1428,10 @@ function tryHop(p,dx,dy){
     if(dx===0 && Math.abs(cx0)>XMAX+2) return;
   }
   if(ty<killY()+0.4) return;
-  /* op het eindterrein blijf je binnen het feest */
-  if(finished && (ty > CFG.finish+13 || ty < CFG.finish-2)) return;
+  /* Op het eindterrein blijf je binnen het feest. Is er nog een wereld te
+     gaan, dan mag je één rij verder: dat is de poort. */
+  const eind = CFG.finish + (volgendeWereld()>=0 ? CFG.poortRij : CFG.feestRijen);
+  if(finished && (ty > eind || ty < CFG.finish-2)) return;
   const r=getRow(ty);
   if(r.type==='grass' && r.obs) for(let i=0;i<r.obs.length;i++) if(r.obs[i].x===tx) return;
   p.trail.unshift({x:p.x, y:p.y});
@@ -1542,6 +1571,11 @@ function updPlayer(p,dt){
       burst(p1.x, p1.py, 0.9, 8, BALLC[i%BALLC.length], 2.6);
       burst(p2.x, p2.py, 0.9, 8, BALLC[(i+3)%BALLC.length], 2.6);
     }
+  }
+  /* door de poort gelopen: meteen door naar de volgende wereld */
+  if(finished && p.hopT>=1 && p.y===CFG.finish+CFG.poortRij && volgendeWereld()>=0){
+    doorNaarVolgende();
+    return;
   }
   /* wat sta je te doen op het kermisterrein? */
   if(finished && p.hopT>=1){
@@ -1829,8 +1863,37 @@ function drawKamptent(x,y){
   box3(x-1.0, y+0.30, 0.08, 0.08, 0, 0.55, pal('#8E6033'));
   box3(x-1.0, y+0.30, 0.16, 0.16, 0.55, 0.14, pal('#F2C21C'));   /* lampionnetje */
 }
+/* De poort naar de volgende wereld, helemaal achteraan het feestterrein.
+   Loop je eronderdoor, dan begint de volgende wereld meteen. */
+function drawPoort(y){
+  const nw=volgendeWereld(); if(nw<0) return;
+  const kl = nw===1 ? '#2E5FBF' : '#3A2E6E';        /* Amerika blauw, Nacht paars */
+  const gl = 0.55+0.45*Math.sin(T*2.6);             /* de doorgang pulseert */
+  /* een gekleurde streep dwars over de hele rij: waar je ook staat, hier ga
+     je erdoorheen */
+  flat(XMIN-0.5, XMAX+0.5, y-0.5, y+0.5, 0.012, sh(kl, 1.5));
+  ctx.globalAlpha = 0.30+0.25*gl;
+  flat(XMIN-0.5, XMAX+0.5, y-0.16, y+0.16, 0.016, '#FFF6C8');
+  ctx.globalAlpha = 1;
+  for(let s=-1;s<=1;s+=2){
+    box3(s*2.55, y, 0.34, 0.34, 0, 2.30, pal(kl));
+    box3(s*2.55, y, 0.48, 0.48, 0, 0.22, pal(sh(kl,0.75)));
+    box3(s*2.55, y, 0.44, 0.44, 2.24, 0.16, pal('#F5D33C'));
+  }
+  box3(0, y, 5.5, 0.30, 2.20, 0.42, pal(kl));
+  /* de opening zelf: een zachte gloed tussen de palen */
+  ctx.globalAlpha = 0.16+0.14*gl;
+  box3(0, y+0.10, 4.7, 0.10, 0.05, 2.15, pal(nw===1?'#7FC4FF':'#B79BFF'));
+  ctx.globalAlpha = 1;
+  for(let i=-2;i<=2;i++)
+    box3(i*1.0, y-0.16, 0.22, 0.10, 0.10+((i+2+Math.floor(T*3))%5)*0.40, 0.18,
+         pal(i%2 ? '#F5D33C' : '#FFF0A8'));
+  say(0, y-0.17, 2.62, SCEN[nw].naam.toUpperCase(), 1);
+  say(0, y-0.17, 1.30, 'LOOP DOOR', 1);
+}
 function drawDeco(kind,y){
   if(kind==='gate')            drawGate(y);
+  else if(kind==='poort')      drawPoort(y);
   else if(kind==='tent')       drawTent(-2.4, y);
   else if(kind==='ballpit')    drawBallpit(2.3, y);
   else if(kind==='frituur')    drawFrituur(-1.9, y);
@@ -2057,9 +2120,27 @@ function drawObs(o,y){
     }
     return;
   }
-  if(o.kind===0){ box3(o.x,y,0.34,0.34,0.15,0.30,C.trunk); box3(o.x,y,0.80,0.80,0.45,o.h,o.pal); }
-  else if(o.kind===1){ box3(o.x,y,0.78,0.78,0.15,0.34,C.bush); box3(o.x,y,0.52,0.52,0.49,0.22,C.bushT); }
-  else box3(o.x,y,0.72,0.72,0.15,0.46,C.rock);
+  if(o.kind===0){
+    /* boom: stam, brede onderkroon en een smallere top erop, met een lichtere
+       rand bovenaan — dat leest als een boom in plaats van een groene plaat */
+    box3(o.x, y, 0.34, 0.34, 0.15, 0.30, C.trunk);
+    const kh=o.h;
+    box3(o.x,        y,        0.82, 0.82, 0.42,          kh*0.52, o.pal);
+    box3(o.x-0.03,   y+0.03,   0.64, 0.64, 0.42+kh*0.50,  kh*0.34, o.pal);
+    box3(o.x+0.02,   y-0.02,   0.40, 0.40, 0.42+kh*0.82,  kh*0.22,
+         pal(sh(o.pal[0],1.13)));
+  }
+  else if(o.kind===1){
+    box3(o.x, y, 0.78, 0.78, 0.15, 0.30, C.bush);
+    box3(o.x-0.10, y+0.06, 0.50, 0.50, 0.43, 0.20, C.bushT);
+    box3(o.x+0.16, y-0.08, 0.34, 0.34, 0.41, 0.16, C.bushT);
+  }
+  else {
+    /* kei: een grote blok met een kleinere er scheef bovenop */
+    box3(o.x, y, 0.70, 0.68, 0.15, 0.34, C.rock);
+    box3(o.x-0.09, y+0.06, 0.46, 0.44, 0.47, 0.19, pal(sh(C.rock[0],1.12)));
+    box3(o.x+0.40, y-0.16, 0.24, 0.22, 0.15, 0.15, pal(sh(C.rock[0],0.86)));
+  }
 }
 /* ---------- eigen pixelfont (4x5) --------------------------------------------
    De gewone canvas-tekst wordt korrelig zodra we het lage-resolutiebeeld
@@ -2183,35 +2264,127 @@ function drawCrossing(r,y,side){
   }
 }
 
+/* ---------- voertuigen --------------------------------------------------------
+   De camera kijkt schuin van boven, dus je ziet vooral het dak en de flank aan
+   de camerazijde. Daar zit dus het meeste detail: ramen, een bies, wielen die
+   onder de bak uitsteken. De neus zie je alleen als de auto naar rechts rijdt. */
+const RUIT   = pal('#2B3F55'), BAND = pal('#1E1E26'), VELG = pal('#9A9CA6'),
+      CHROOM = pal('#D4D8E0'), KOPL = pal('#FFF3C0'), ACHTL = pal('#D8342C'),
+      RUBBER = pal('#26262E');
+/* Wielen aan de kant waar de camera naar kijkt; de andere kant zie je toch
+   niet, dus die slaan we over. Op dit formaat is een velg maar een paar
+   pixels, dus die tekenen we alleen als de auto groot genoeg in beeld staat. */
+function wielen(x, y, len, breed, z, dik){
+  const wx=len*0.31, r=dik||0.16;
+  for(let s=-1;s<=1;s+=2){
+    box3(x+s*wx, y-breed/2+0.05, 0.28, 0.17, z, r, BAND);
+    if(TILE>30) box3(x+s*wx, y-breed/2+0.02, 0.13, 0.05, z+r*0.30, r*0.42, VELG);
+  }
+}
+function drawAuto(x, y, d, v, p){
+  const L=v.len, br=0.76, dak=pal(sh(v.col,1.10));
+  wielen(x, y, L, br, 0, 0.16);
+  box3(x, y, L, br, 0.10, 0.19, p);                       /* onderbak */
+  boxSides(x, y-br/2-0.005, L, 0.02, 0.10, 0.05, pal(sh(v.col,0.66)));  /* schaduwbies */
+  const cx = x - d*(v.hatch ? 0.04 : 0.12);               /* cabine iets naar achteren */
+  const cl = L*(v.hatch ? 0.60 : 0.50);
+  box3(cx, y, cl, br-0.07, 0.29, 0.20, p);                /* cabine */
+  boxSides(cx, y-br/2+0.028, cl-0.14, 0.02, 0.32, 0.13, RUIT);          /* zijruiten */
+  box3(cx, y, cl-0.10, br-0.16, 0.49, 0.03, dak);         /* dak */
+  /* neus: grille met koplampen, staart: achterlichten */
+  box(x+d*(L/2-0.02), y, 0.07, br-0.06, 0.14, 0.13, KOPL[0], KOPL[1], KOPL[2]);
+  box(x-d*(L/2-0.02), y, 0.06, br-0.14, 0.15, 0.09, ACHTL[0], ACHTL[1], ACHTL[2]);
+}
+function drawBestelbus(x, y, d, v, p){
+  const L=v.len, br=0.82;
+  wielen(x, y, L, br, 0, 0.17);
+  box3(x, y, L, br, 0.11, 0.46, C.white);                 /* hoge witte bak */
+  box3(x + d*(L*0.22), y, L*0.42, br, 0.11, 0.34, p);     /* gekleurde cabine */
+  boxSides(x + d*(L*0.24), y-br/2+0.02, L*0.30, 0.02, 0.30, 0.13, RUIT);
+  boxSides(x - d*(L*0.20), y-br/2-0.005, L*0.44, 0.02, 0.24, 0.14, pal(sh(v.col,1.0)));
+  box3(x, y, L-0.14, br-0.14, 0.57, 0.03, pal('#E8E8EE'));
+  ribbels(x - d*0.18, y, L*0.52, br-0.20, 0.60);
+  box(x+d*(L/2-0.02), y, 0.07, br-0.08, 0.16, 0.12, KOPL[0], KOPL[1], KOPL[2]);
+}
+/* dwarsribbels op een groot wit dak, anders is het één saaie plaat */
+function ribbels(x, y, len, breed, z){
+  const rib=pal('#D8D8E0');
+  box3(x-len*0.18, y, 0.05, breed, z, 0.018, rib);
+  box3(x+len*0.18, y, 0.05, breed, z, 0.018, rib);
+}
+/* De oldtimer: lange motorkap, hoge smalle cabine, losse spatborden,
+   een treeplank, chromen grille en het reservewiel achterop. */
+function drawOldtimer(x, y, d, v, p){
+  const L=v.len, br=0.72, crm=pal('#EDE7D2');
+  const wx=L*0.33;
+  for(let s=-1;s<=1;s+=2){                                /* dikke wielen met velg */
+    box3(x+s*wx, y-br/2+0.03, 0.24, 0.20, 0, 0.21, BAND);
+    box3(x+s*wx, y-br/2-0.01, 0.11, 0.05, 0.06, 0.09, CHROOM);
+    box3(x+s*wx, y, 0.30, br+0.10, 0.20, 0.07, p);        /* spatbord erover */
+  }
+  box3(x, y, L*0.52, br+0.07, 0.055, 0.05, pal(sh(v.col,0.62)));        /* treeplank */
+  box3(x, y, L, br, 0.11, 0.19, p);                       /* onderbak */
+  box3(x + d*(L*0.27), y, L*0.42, br-0.07, 0.30, 0.12, p);/* lange motorkap */
+  boxSides(x + d*(L*0.27), y-br/2+0.04, L*0.36, 0.02, 0.33, 0.055, pal(sh(v.col,0.70)));
+  const cx = x - d*(L*0.19);
+  box3(cx, y, L*0.38, br-0.05, 0.30, 0.25, p);            /* hoge, korte cabine */
+  boxSides(cx, y-br/2+0.03, L*0.32, 0.02, 0.35, 0.15, RUIT);
+  box3(cx, y, L*0.40, br-0.01, 0.55, 0.035, crm);         /* linnen dak */
+  box3(x + d*(L*0.02), y, 0.045, br-0.09, 0.42, 0.13, RUIT);  /* voorruit rechtop */
+  /* chromen grille met twee ronde koplampen ernaast */
+  box(x+d*(L/2-0.01), y, 0.06, br-0.24, 0.13, 0.23, CHROOM[0], CHROOM[1], CHROOM[2]);
+  for(let s=-1;s<=1;s+=2)
+    box3(x+d*(L/2-0.11), y+s*(br/2-0.07), 0.12, 0.12, 0.26, 0.11, KOPL);
+  box3(x+d*(L/2-0.05), y, 0.09, br+0.07, 0.10, 0.045, CHROOM);           /* bumper */
+  box3(x-d*(L/2+0.01), y, 0.09, 0.26, 0.14, 0.25, BAND);                 /* reservewiel */
+  box3(x-d*(L/2+0.02), y, 0.045, 0.11, 0.22, 0.10, CHROOM);
+}
+function drawTruck(x, y, d, v, p){
+  const L=v.len, br=0.84;
+  wielen(x, y, L, br, 0, 0.18);
+  box3(x + d*0.06, y, L*0.15, br-0.10, 0.06, 0.14, RUBBER);              /* koppeling */
+  box3(x - d*0.42, y, L-0.85, br, 0.14, 0.56, C.white);                  /* oplegger */
+  boxSides(x - d*0.42, y-br/2-0.005, L-1.05, 0.02, 0.24, 0.22, pal(sh(v.col,1.0)));
+  box3(x - d*0.42, y, L-1.00, br-0.12, 0.68, 0.03, pal('#E4E4EA'));
+  ribbels(x - d*0.42, y, L-1.10, br-0.18, 0.71);
+  box3(x + d*(L/2-0.42), y, 0.84, br, 0.12, 0.46, p);                    /* cabine */
+  boxSides(x + d*(L/2-0.42), y-br/2+0.025, 0.60, 0.02, 0.32, 0.15, RUIT);
+  box3(x + d*(L/2-0.42), y, 0.78, br-0.12, 0.57, 0.04, pal(sh(v.col,1.12)));
+  box(x + d*(L/2-0.01), y, 0.06, br-0.10, 0.16, 0.13, KOPL[0], KOPL[1], KOPL[2]);
+}
+function drawBus(x, y, d, v){
+  const L=v.len, br=0.88, B=pal('#F2B713');
+  wielen(x, y, L, br, 0, 0.18);
+  box3(x, y, L, br, 0.12, 0.72, B);
+  box3(x, y, L-0.16, br-0.10, 0.83, 0.05, pal('#E0A70F'));               /* dak */
+  boxSides(x, y-br/2-0.005, L-0.30, 0.02, 0.44, 0.24, pal('#2A3440'));   /* ramen */
+  boxSides(x, y-br/2-0.006, L, 0.02, 0.19, 0.08, pal('#22222A'));        /* zwarte bies */
+  boxSides(x, y-br/2-0.006, L, 0.02, 0.72, 0.05, pal('#22222A'));
+  box3(x - d*(L/2-0.16), y, 0.26, br, 0.12, 0.50, pal('#E8AE10'));       /* stompe neus */
+  box(x + d*(L/2+0.01), y, 0.08, br-0.20, 0.20, 0.14, KOPL[0], KOPL[1], KOPL[2]);
+  box3(x - d*(L/2-0.10), y, 0.14, 0.26, 0.84, 0.10, ACHTL);              /* zwaailicht */
+}
 function drawVeh(r,v,y){
   if(v.bike) return drawCyclist(r,v,y);
-  const x=vehX(r,v), p=pal(v.col);
+  const x=vehX(r,v), d=r.dir, p=pal(v.col);
   ctx.globalAlpha=0.15;
-  flat(x-v.len/2+0.10, x+v.len/2+0.10, y-0.30, y+0.50, 0.004, '#101820');
+  flat(x-v.len/2+0.10, x+v.len/2+0.10, y-0.28, y+0.46, 0.004, '#101820');
   ctx.globalAlpha=1;
-  if(v.bus){                                  /* gele Amerikaanse schoolbus */
-    const B=pal('#F2B713');
-    box3(x, y, v.len, 0.88, 0, 0.86, B);
-    box3(x, y, v.len-0.20, 0.92, 0.86, 0.10, pal('#E0A70F'));
-    boxSides(x, y-0.45, v.len-0.35, 0.03, 0.42, 0.30, pal('#2A3440'));   /* ramen */
-    boxSides(x, y-0.45, v.len, 0.03, 0.16, 0.10, pal('#2A2A32'));        /* zwarte bies */
-    box3(x - r.dir*(v.len/2-0.18), y, 0.30, 0.88, 0, 0.60, pal('#E8AE10'));
-    box3(x + r.dir*(v.len/2+0.02), y, 0.10, 0.66, 0.10, 0.16, pal('#F2F2F6'));
-    box3(x - r.dir*(v.len/2-0.10), y, 0.14, 0.30, 0.96, 0.10, pal('#D8342C'));
-    return;
-  }
-  if(v.truck){
-    box3(x-r.dir*0.42, y, v.len-0.85, 0.84, 0, 0.66, C.white);
-    box3(x+r.dir*(v.len/2-0.42), y, 0.84, 0.84, 0, 0.52, p);
-  }else{
-    box3(x, y, v.len, 0.80, 0, 0.27, p);
-    box3(x-r.dir*0.06, y, v.len*0.56, 0.66, 0.27, 0.25, C.white);
-    box(x+r.dir*(v.len/2-0.06), y, 0.08, 0.62, 0.06, 0.12, '#FFE9A8','#E8CE86','#CBB26F');
-  }
+  if(v.bus)      drawBus(x,y,d,v);
+  else if(v.truck) drawTruck(x,y,d,v,p);
+  else if(v.old)   drawOldtimer(x,y,d,v,p);
+  else if(v.van)   drawBestelbus(x,y,d,v,p);
+  else             drawAuto(x,y,d,v,p);
 }
 function drawLog(r,i,y){
   if(r.logs[i].boat) return drawBoat(r,i,y);
-  box(logC(r,i), y, r.logs[i].len, 0.86, -0.02, 0.30, C.logT,C.logF,C.logS);
+  const c=logC(r,i), L=r.logs[i].len, z=0.28;
+  box(c, y, L, 0.86, -0.02, 0.30, C.logT, C.logF, C.logS);
+  /* twee naden en een lichte plank erover: dan leest het als een houten vlot
+     in plaats van als één bruine plaat. Platte vlakken zijn goedkoop. */
+  flat(c-L/2, c+L/2, y-0.16, y-0.13, z, C.logS);
+  flat(c-L/2, c+L/2, y+0.13, y+0.16, z, C.logS);
+  flat(c-L/2+0.06, c+L/2-0.06, y-0.36, y-0.20, z, '#A87548');
 }
 /* NS-trein: gele bak met blauwe band en donkerblauwe ramenstrook */
 const NS_GEEL=pal('#F5C51C'), NS_BLAUW=pal('#1B4EA0'), NS_DONKER=pal('#16305E');
@@ -2502,7 +2675,7 @@ function draw(){
     oN=0;
     if(r.deco) push(r.deco==='ballpit' ? 2.3 : r.deco==='flagpole' ? 3.2
                   : (r.deco==='gate'||r.deco==='president'||r.deco==='whitehouse'
-                     ||r.deco==='kampvuur') ? 0
+                     ||r.deco==='kampvuur'||r.deco==='poort') ? 0
                   : -2.3, 11, r.deco);
     if(r.lm)   push(XMIN-2.2, 9, r.lm);
     if(r.sign) push(XMIN-2.2, 10, r);
@@ -2738,7 +2911,10 @@ function frame(ts){
     let tg=-1e9;
     if(p1.alive) tg=Math.max(tg,p1.py);
     if(p2.alive) tg=Math.max(tg,p2.py);
-    if(finished) tg=Math.min(tg, CFG.finish+1);      /* bij de finish blijft de camera staan */
+    /* Bij de finish blijft de camera staan, zodat je het hele feestterrein
+       ziet. Loop je door richting de poort, dan schuift hij toch mee, anders
+       verdwijn je bovenaan uit beeld. */
+    if(finished) tg=Math.min(tg, CFG.finish + (tg>CFG.finish+9 ? 7 : 1));
     if(tg>camY){ camY += (tg-camY)*Math.min(1,dt*CFG.camFollow); idleT=0; }
     else if(!finished){
       /* blijft iedereen staan, dan kruipt de camera langzaam door zodat het potje vordert */
@@ -2750,7 +2926,7 @@ function frame(ts){
       for(const k of rows.keys()) if(k<cut) rows.delete(k); }
     if(partyT>0){
       partyT-=dt;
-      if(doneT>0){ doneT-=dt; if(doneT<=0) $('doneBtn').classList.remove('hide'); }
+      if(doneT>0){ doneT-=dt; if(doneT<=0) toonKlaar(); }
       if(Math.random()<0.16){
         const p = Math.random()<0.5 ? p1 : p2;
         burst(p.x+rnd(-1,1), p.py+rnd(-1,1), 1.4, 2, pick(BALLC), 1.8);
@@ -2795,14 +2971,61 @@ function bestRegel(nieuw){
   return nieuw ? ' Nieuw record: rij '+sessieBest+'!'
                : sessieBest ? ' Record deze sessie: rij '+sessieBest+'.' : '';
 }
-function winTogether(){
-  gs='over'; partyT=0;
+/* De Klaar-knop verschijnt, met eronder de tip dat je ook door kunt lopen. */
+function toonKlaar(){
+  $('doneBtn').classList.remove('hide');
+  const h=$('doneHint'), nw=volgendeWereld();
+  if(!h) return;
+  if(nw<0){ h.classList.add('hide'); return; }
+  h.textContent = 'of loop door de poort naar '+SCEN[nw].naam;
+  h.classList.remove('hide');
+}
+function verbergKlaar(){
   $('doneBtn').classList.add('hide');
+  const h=$('doneHint'); if(h) h.classList.add('hide');
+}
+/* Welke wereld komt hierna? -1 als dit de laatste is. */
+function volgendeWereld(){
+  if(scenario===0) return 1;
+  if(scenario===1) return 2;
+  return -1;
+}
+/* Alles wat er bij het uitspelen van een wereld hoort: punten bijschrijven,
+   de volgende wereld vrijspelen en de uitslag versturen. Dit gebeurt zowel
+   als je op Klaar tikt als wanneer je gewoon door de poort loopt, zodat je
+   met doorlopen niets misloopt. */
+let afgerond=false;
+function rondeAfronden(){
+  if(afgerond) return {usa:false, nacht:false};
+  afgerond=true;
   wins[0]++; wins[1]++;
-  const eerstUSA   = !usaUnlocked && scenario===0;
-  const eerstNacht = !nachtUnlocked && scenario===1;
+  const eerst = {usa: !usaUnlocked && scenario===0,
+                 nacht: !nachtUnlocked && scenario===1};
   if(scenario===0) usaUnlocked = true;      /* Nederland uit: Amerika verdiend */
   if(scenario===1) nachtUnlocked = true;    /* Amerika uit: de nacht verdiend */
+  uitdaging('finish');
+  betaalUit();
+  meldRonde(true);
+  return eerst;
+}
+/* Door de poort lopen: meteen door naar de volgende wereld, zonder eerst
+   langs het eindscherm en het menu. */
+function doorNaarVolgende(){
+  const nw = volgendeWereld();
+  if(nw<0) return;
+  rondeAfronden();
+  const naam = SCEN[nw].naam;
+  sfxWin();
+  setScenario(nw);
+  start();
+  showBanner('Door naar '+naam+'!');
+  if(navigator.vibrate) try{navigator.vibrate([40,40,80]);}catch(e){}
+}
+function winTogether(){
+  gs='over'; partyT=0;
+  verbergKlaar();
+  const eerst = rondeAfronden();
+  const eerstUSA = eerst.usa, eerstNacht = eerst.nacht;
   endTitle.textContent='Samen gewonnen!';
   const lift = p1.rescues+p2.rescues;
   const plek = scenario===1 ? 'tot aan het Witte Huis, waar de president stond te zwaaien. '
@@ -2817,9 +3040,14 @@ function winTogether(){
     + (eerstUSA   ? ' AMERIKA ONTGRENDELD — kies hem bij Ander personage.'
      : eerstNacht ? ' DE NACHT ONTGRENDELD — de zwaarste wereld, alleen jullie hoofdlampjes.'
      : '');
-  uitdaging('finish');
-  sfxWin(); betaalUit();
-  meldRonde(true);
+  sfxWin();
+  /* knop naar de volgende wereld, ook vanaf het eindscherm */
+  const nw=volgendeWereld();
+  const vb=$('verder');
+  if(vb){
+    if(nw<0) vb.classList.add('hide');
+    else { vb.classList.remove('hide'); vb.textContent='Verder naar '+SCEN[nw].naam; }
+  }
   endScr.classList.remove('hide');
   if(navigator.vibrate) try{navigator.vibrate([60,50,60,50,120]);}catch(e){}
 }
@@ -3292,7 +3520,7 @@ function klaarMetFeest(e){
   if(e){ e.preventDefault(); e.stopPropagation(); }
   if(klaarBezig) return;
   klaarBezig=true; setTimeout(function(){ klaarBezig=false; }, 400);
-  $('doneBtn').classList.add('hide');
+  verbergKlaar();
   if(gs==='play' || gs==='dying'){
     if(finished || partyT>0) winTogether();
     else goHome();
@@ -3300,6 +3528,13 @@ function klaarMetFeest(e){
 }
 $('doneBtn').addEventListener('click', klaarMetFeest);
 $('doneBtn').addEventListener('touchend', klaarMetFeest, {passive:false});
+/* dezelfde stap, maar dan vanaf het eindscherm */
+$('verder').addEventListener('click', function(){
+  const nw=volgendeWereld(); if(nw<0) return;
+  endScr.classList.add('hide');
+  setScenario(nw); start();
+  showBanner('Door naar '+SCEN[nw].naam+'!');
+});
 $('toShop').addEventListener('click', toonWinkel);
 $('shopEnd').addEventListener('click', toonWinkel);
 $('shopClose').addEventListener('click', goHome);
