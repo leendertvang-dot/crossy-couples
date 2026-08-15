@@ -226,6 +226,32 @@
   .lbvoet{font-size:10px;font-weight:700;color:#BFD8AC;text-shadow:1px 1px 0 #000;
     padding:8px 3px 0;line-height:1.5}
   .lbvoet.dun{color:rgba(255,255,255,.34);font-size:9px;padding-top:5px}
+
+  /* tabblad Gebruik: oplopende lijn met het totaal aantal potjes */
+  .lijnbox{position:relative;width:100%;height:112px;
+    background:rgba(0,0,0,.30);border:2px solid rgba(255,255,255,.14);
+    border-radius:8px;box-sizing:border-box;overflow:hidden}
+  .lijnbox svg{display:block;width:100%;height:100%}
+  .lijnbox u{position:absolute;left:8px;top:5px;font-size:11px;font-weight:900;
+    color:#F5D33C;text-decoration:none;text-shadow:1px 1px 0 #000}
+  .lijnbox .vlak{fill:rgba(245,211,60,.17);stroke:none}
+  .lijnbox .lijn{fill:none;stroke:#FFD84A;stroke-width:2.4;
+    stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+  .lijnbox .hulp{fill:none;stroke:rgba(255,255,255,.14);stroke-width:1;
+    stroke-dasharray:3 4;vector-effect:non-scaling-stroke}
+  .lijnbox .punt{fill:#B9F07A;stroke:#2A3A18;stroke-width:1;
+    vector-effect:non-scaling-stroke}
+  .asx{display:flex;justify-content:space-between;font-size:9.5px;font-weight:800;
+    color:#BFD8AC;text-shadow:1px 1px 0 #000;padding:4px 2px 0}
+  .asx b{color:#F5D33C;font-weight:900}
+  .kaartjes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+  .kaartjes div{background:rgba(0,0,0,.28);border:2px solid rgba(255,255,255,.13);
+    border-radius:8px;padding:6px 8px}
+  .kaartjes span{display:block;font-size:9px;font-weight:800;letter-spacing:.07em;
+    text-transform:uppercase;color:#BFD8AC;text-shadow:1px 1px 0 #000}
+  .kaartjes b{display:block;font-size:15px;font-weight:900;color:#fff;
+    text-shadow:1px 1px 0 #000;line-height:1.3}
+  .kaartjes b small{font-size:10px;color:#F5D33C;font-weight:800}
   #lbBox{width:100%;max-width:360px;max-height:56vh;overflow-y:auto;touch-action:pan-y;
     background:rgba(0,0,0,.30);border:3px solid rgba(255,255,255,.18);border-radius:9px;padding:6px}
   #lbMsg{color:#fff;font-size:12.5px;font-weight:700;padding:14px 8px;line-height:1.5;
@@ -347,6 +373,7 @@
       <button class="tbtn on" id="tabChar">Personages</button>
       <button class="tbtn"    id="tabTeam">Teams</button>
       <button class="tbtn"    id="tabNacht">Nachtbrakers</button>
+      <button class="tbtn"    id="tabGebruik">Gebruik</button>
     </div>
     <div id="lbSub">alle potjes bij elkaar opgeteld</div>
     <div id="lbBox"><div id="lbMsg">Laden…</div></div>
@@ -3244,7 +3271,7 @@ function tijdKort(s){
 }
 /* Het teamtabblad kan om drie redenen leeg zijn. Dit zegt welke het is,
    in plaats van alleen "nog geen teams". */
-const SCRIPT_VERSIE = 3;                 /* hoort bij leaderboard-appsscript.gs */
+const SCRIPT_VERSIE = 4;                 /* hoort bij leaderboard-appsscript.gs */
 function teamUitleg(){
   const v = lbData && lbData.versie || 0;
   if(v < SCRIPT_VERSIE){
@@ -3265,18 +3292,107 @@ function teamUitleg(){
   }
   return 'Nog geen teams. Vul een teamnaam in op het keuzescherm en speel een potje.';
 }
+/* ---------- tabblad Gebruik --------------------------------------------------
+   Een staafje per dag, van de allereerste dag dat er gespeeld werd tot vandaag.
+   Dagen zonder potjes blijven leeg staan, want juist die gaten vertellen iets.
+   Loopt het meer dan tien weken, dan gaan we per week bundelen zodat de
+   staafjes leesbaar blijven. */
+const MND=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+function alsDatum(d){ return d.getDate()+' '+MND[d.getMonth()]; }
+function alsDatumJaar(d){ return d.getDate()+' '+MND[d.getMonth()]+' '+d.getFullYear(); }
+function leesDag(s){
+  const p=String(s).split('-');
+  return new Date(+p[0], (+p[1])-1, +p[2]);
+}
+function dagCode(d){
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+function tekenGebruik(){
+  const dg = (lbData && lbData.dagen) || [];
+  if(!dg.length) return '<div id="lbMsg">Nog geen potjes gespeeld. Zodra jullie '
+    + 'het eerste potje doen verschijnt hier de grafiek.</div>';
+
+  const telling={}; let totaal=0;
+  for(let i=0;i<dg.length;i++){ telling[dg[i].d]=dg[i].n; totaal+=dg[i].n; }
+
+  const eerste=leesDag(dg[0].d);
+  const vandaag=new Date(); vandaag.setHours(0,0,0,0);
+  let laatste=leesDag(dg[dg.length-1].d);
+  if(vandaag>laatste) laatste=vandaag;
+  const dag=86400000;
+  const spanne=Math.max(1, Math.round((laatste-eerste)/dag)+1);
+
+  /* De lijn loopt op met het aantal potjes tot dan toe, dus hij daalt nooit.
+     Vlakke stukken zijn dagen dat er niet gespeeld werd, steile stukken
+     drukke dagen. Elke dag krijgt een punt; een lijn blijft ook bij een jaar
+     aan gegevens leesbaar, dus hier hoeft niets gebundeld te worden. */
+  const W=320, H=112, PL=4, PR=4, PT=9, PB=4;
+  const iw=W-PL-PR, ih=H-PT-PB;
+  const xv = i => PL + (spanne===1 ? iw/2 : iw*i/(spanne-1));
+  const yv = s => PT + ih - ih*(totaal ? s/totaal : 0);
+
+  let som=0, hoogste=0, drukst=null, lijn='', vlak='';
+  for(let i=0;i<spanne;i++){
+    const d=new Date(eerste.getTime()+i*dag);
+    const n=telling[dagCode(d)]||0;
+    som+=n;
+    if(n>hoogste){ hoogste=n; drukst=d; }
+    const x=xv(i).toFixed(1), y=yv(som).toFixed(1);
+    lijn += (i?'L':'M')+x+' '+y+' ';
+    vlak += (i?'L':'M')+x+' '+y+' ';
+  }
+  vlak += 'L'+xv(spanne-1).toFixed(1)+' '+(PT+ih)+' L'+xv(0).toFixed(1)+' '+(PT+ih)+' Z';
+
+  /* een hulplijn op de helft, zodat je de schaal kunt inschatten */
+  const half=(PT+ih-ih/2).toFixed(1);
+  let h='<div class="lijnbox"><svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none">'
+   + '<path class="vlak" d="'+vlak+'"/>'
+   + '<path class="hulp" d="M'+PL+' '+half+' L'+(W-PR)+' '+half+'"/>'
+   + '<path class="lijn" d="'+lijn+'"/>'
+   + '<path class="punt" d="M'+(xv(spanne-1)-2.6).toFixed(1)+' '+yv(totaal).toFixed(1)
+     + ' l2.6 -3.4 l2.6 3.4 l-2.6 3.4 Z"/>'
+   + '</svg><u>'+totaal+'</u></div>';
+  h+='<div class="asx"><b>'+esc(alsDatum(eerste))+'</b>'
+   + '<span>'+spanne+' dagen</span>'
+   + '<b>'+esc(alsDatum(laatste))+'</b></div>';
+
+  const speeldagen=dg.length;
+  const gem=(totaal/speeldagen);
+  h+='<div class="kaartjes">'
+   + '<div><span>Eerste potje</span><b>'+esc(alsDatumJaar(eerste))+'</b></div>'
+   + '<div><span>Potjes totaal</span><b>'+totaal+'</b></div>'
+   + '<div><span>Drukste dag</span><b>'
+     + (drukst?esc(alsDatum(drukst))+' <small>'+hoogste+'</small>':'–')+'</b></div>'
+   + '<div><span>Dagen gespeeld</span><b>'+speeldagen
+     + ' <small>van '+spanne+'</small></b></div>'
+   + '</div>';
+  const stil=Math.round((vandaag-leesDag(dg[dg.length-1].d))/dag);
+  h+='<div class="lbvoet">'
+   + 'Gemiddeld '+gem.toFixed(1)+' potjes op een dag dat er gespeeld werd. '
+   + (stil<=0 ? 'Vandaag is er al gespeeld.'
+      : stil===1 ? 'Laatste potje was gisteren.'
+      : 'Laatste potje was '+stil+' dagen geleden.')
+   + '</div>';
+  return h;
+}
 function tekenTabel(){
   const box=$('lbBox');
-  const teams = lbTab===1, nachts = lbTab===2;
+  const teams = lbTab===1, nachts = lbTab===2, gebruik = lbTab===3;
   const rij = nachts ? (lbData.nacht||[]) : teams ? (lbData.teams||[]) : (lbData.lijst||[]);
   const oud = (lbData && lbData.versie || 0) < SCRIPT_VERSIE;
-  $('lbSub').innerHTML = (nachts
+  $('lbSub').innerHTML = (gebruik
+      ? 'het totaal aantal potjes, opgeteld sinds dag \u00e9\u00e9n'
+      : nachts
       ? 'wie zat er het laatst nog te spelen'
       : teams
       ? 'per team, beide spelers bij elkaar opgeteld'
       : 'per personage, alle potjes bij elkaar opgeteld')
     + (oud ? '<br><b class="waarsch">Let op: het script in je spreadsheet is nog de '
-             + 'oude versie, dus Team, Snelst en Nachtbrakers blijven leeg.</b>' : '');
+             + 'oude versie, dus Team, Snelst, Nachtbrakers en Gebruik blijven leeg.</b>' : '');
+  if(gebruik){
+    box.innerHTML = oud ? '<div id="lbMsg">'+teamUitleg()+'</div>' : tekenGebruik();
+    return;
+  }
   if(!rij.length){
     box.innerHTML='<div id="lbMsg">'+((teams||nachts) ? teamUitleg()
       : 'Nog geen potjes gespeeld. Wees de eerste!')+'</div>';
@@ -3402,6 +3518,7 @@ function zetTab(i){
   $('tabChar').className ='tbtn'+(i===0?' on':'');
   $('tabTeam').className ='tbtn'+(i===1?' on':'');
   $('tabNacht').className='tbtn'+(i===2?' on':'');
+  $('tabGebruik').className='tbtn'+(i===3?' on':'');
   if(lbData) tekenTabel();
 }
 function toonRanglijst(){
@@ -3561,6 +3678,7 @@ $('shopClose').addEventListener('click', goHome);
 $('tabChar').addEventListener('click', function(){ zetTab(0); });
 $('tabTeam').addEventListener('click', function(){ zetTab(1); });
 $('tabNacht').addEventListener('click', function(){ zetTab(2); });
+$('tabGebruik').addEventListener('click', function(){ zetTab(3); });
 (function(){
   const inp=$('teamIn');
   if(!inp) return;
