@@ -159,10 +159,10 @@
   .kies .wie.geen{color:rgba(255,255,255,.42);font-weight:700;font-style:italic}
 
   /* tabbladen in de ranglijst */
-  #lbTabs{display:flex;gap:8px}
+  #lbTabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
   .tbtn{pointer-events:auto;background:rgba(255,255,255,.10);color:#fff;
-    border:3px solid rgba(255,255,255,.22);border-radius:8px;padding:6px 16px;
-    font-size:12px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;cursor:pointer}
+    border:3px solid rgba(255,255,255,.22);border-radius:8px;padding:6px 11px;
+    font-size:11px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
   .tbtn.on{background:#F5D33C;color:#3A2A00;border-color:#000}
 
   #world{display:flex;gap:8px}
@@ -346,6 +346,7 @@
     <div id="lbTabs">
       <button class="tbtn on" id="tabChar">Personages</button>
       <button class="tbtn"    id="tabTeam">Teams</button>
+      <button class="tbtn"    id="tabNacht">Nachtbrakers</button>
     </div>
     <div id="lbSub">alle potjes bij elkaar opgeteld</div>
     <div id="lbBox"><div id="lbMsg">Laden…</div></div>
@@ -3243,7 +3244,7 @@ function tijdKort(s){
 }
 /* Het teamtabblad kan om drie redenen leeg zijn. Dit zegt welke het is,
    in plaats van alleen "nog geen teams". */
-const SCRIPT_VERSIE = 2;                 /* hoort bij leaderboard-appsscript.gs */
+const SCRIPT_VERSIE = 3;                 /* hoort bij leaderboard-appsscript.gs */
 function teamUitleg(){
   const v = lbData && lbData.versie || 0;
   if(v < SCRIPT_VERSIE){
@@ -3266,35 +3267,53 @@ function teamUitleg(){
 }
 function tekenTabel(){
   const box=$('lbBox');
-  const teams = lbTab===1;
-  const rij = teams ? (lbData.teams||[]) : (lbData.lijst||[]);
+  const teams = lbTab===1, nachts = lbTab===2;
+  const rij = nachts ? (lbData.nacht||[]) : teams ? (lbData.teams||[]) : (lbData.lijst||[]);
   const oud = (lbData && lbData.versie || 0) < SCRIPT_VERSIE;
-  $('lbSub').innerHTML = (teams
+  $('lbSub').innerHTML = (nachts
+      ? 'wie zat er het laatst nog te spelen'
+      : teams
       ? 'per team, beide spelers bij elkaar opgeteld'
       : 'per personage, alle potjes bij elkaar opgeteld')
     + (oud ? '<br><b class="waarsch">Let op: het script in je spreadsheet is nog de '
-             + 'oude versie, dus Team en Snelst blijven leeg.</b>' : '');
+             + 'oude versie, dus Team, Snelst en Nachtbrakers blijven leeg.</b>' : '');
   if(!rij.length){
-    box.innerHTML='<div id="lbMsg">'+(teams ? teamUitleg()
+    box.innerHTML='<div id="lbMsg">'+((teams||nachts) ? teamUitleg()
       : 'Nog geen potjes gespeeld. Wees de eerste!')+'</div>';
     return;
   }
-  let h='<table class="lb"><tr><th></th><th>'+(teams?'Team':'Personage')+'</th>'
-      + '<th>Totaal</th><th>Beste</th><th>Potjes</th><th>Finish</th><th>Snelst</th></tr>';
-  for(let i=0;i<rij.length;i++){
-    const r=rij[i];
-    h+='<tr'+(i<3?' class="top"':'')+'><td>'+(i+1)+'</td><td>'+esc(r.naam)+'</td>'
-     + '<td class="tot">'+(r.totaal|0)+'</td><td>'+(r.beste|0)+'</td>'
-     + '<td>'+(r.potjes|0)+'</td><td>'+(r.finishes|0)+'</td>'
-     + '<td>'+tijdKort(r.snelste)+'</td></tr>';
+  let h;
+  if(nachts){
+    /* De tijd staat al in de spreadsheet, dus hier wordt niets extra's
+       verzameld: we lezen alleen terug hoe laat er gespeeld werd. */
+    h='<table class="lb"><tr><th></th><th>Team</th><th>Laatst</th>'
+     +'<th>Na 22u</th><th>Potjes</th><th>Meestal</th></tr>';
+    for(let i=0;i<rij.length;i++){
+      const r=rij[i];
+      h+='<tr'+(i<3?' class="top"':'')+'><td>'+(i+1)+'</td><td>'+esc(r.naam)+'</td>'
+       + '<td class="tot">'+esc(r.laat||'–')+'</td><td>'+(r.natien|0)+'</td>'
+       + '<td>'+(r.potjes|0)+'</td><td>'+esc(r.gem||'–')+'</td></tr>';
+    }
+    h+='</table><div class="lbvoet">Laatst is het laatste tijdstip waarop dit team '
+      +'een potje speelde. Alles na middernacht telt als later dan de avond ervoor.</div>';
+  }else{
+    h='<table class="lb"><tr><th></th><th>'+(teams?'Team':'Personage')+'</th>'
+     +'<th>Totaal</th><th>Beste</th><th>Potjes</th><th>Finish</th><th>Snelst</th></tr>';
+    for(let i=0;i<rij.length;i++){
+      const r=rij[i];
+      h+='<tr'+(i<3?' class="top"':'')+'><td>'+(i+1)+'</td><td>'+esc(r.naam)+'</td>'
+       + '<td class="tot">'+(r.totaal|0)+'</td><td>'+(r.beste|0)+'</td>'
+       + '<td>'+(r.potjes|0)+'</td><td>'+(r.finishes|0)+'</td>'
+       + '<td>'+tijdKort(r.snelste)+'</td></tr>';
+    }
+    h+='</table>';
+    /* Snelst vult zich pas als iemand rij 100 haalt; anders is een snelle tijd
+       alleen maar een snelle dood. Zeg dat er dan even bij. */
+    const geenTijd = rij.every(function(r){ return !(r.snelste>0); });
+    if(geenTijd && !oud)
+      h+='<div class="lbvoet">Snelst telt alleen potjes waarin jullie samen rij 100 '
+        +'haalden. Zodra dat lukt staat de tijd hier.</div>';
   }
-  h+='</table>';
-  /* Snelst vult zich pas als iemand rij 100 haalt; anders is een snelle tijd
-     alleen maar een snelle dood. Zeg dat er dan even bij. */
-  const geenTijd = rij.every(function(r){ return !(r.snelste>0); });
-  if(geenTijd && !oud)
-    h+='<div class="lbvoet">Snelst telt alleen potjes waarin jullie samen rij 100 '
-      +'haalden. Zodra dat lukt staat de tijd hier.</div>';
   const d = lbData && lbData.diag;
   if(d) h+='<div class="lbvoet dun">script v'+(lbData.versie||1)+' · '+d.regels
         +' uitslagen · '+d.metTeam+' met teamnaam</div>';
@@ -3380,8 +3399,9 @@ function toonWinkel(){
 }
 function zetTab(i){
   lbTab=i;
-  $('tabChar').className='tbtn'+(i===0?' on':'');
-  $('tabTeam').className='tbtn'+(i===1?' on':'');
+  $('tabChar').className ='tbtn'+(i===0?' on':'');
+  $('tabTeam').className ='tbtn'+(i===1?' on':'');
+  $('tabNacht').className='tbtn'+(i===2?' on':'');
   if(lbData) tekenTabel();
 }
 function toonRanglijst(){
@@ -3540,6 +3560,7 @@ $('shopEnd').addEventListener('click', toonWinkel);
 $('shopClose').addEventListener('click', goHome);
 $('tabChar').addEventListener('click', function(){ zetTab(0); });
 $('tabTeam').addEventListener('click', function(){ zetTab(1); });
+$('tabNacht').addEventListener('click', function(){ zetTab(2); });
 (function(){
   const inp=$('teamIn');
   if(!inp) return;
