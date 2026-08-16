@@ -159,10 +159,11 @@
   .kies .wie.geen{color:rgba(255,255,255,.42);font-weight:700;font-style:italic}
 
   /* tabbladen in de ranglijst */
-  #lbTabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  #lbTabs{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:340px}
   .tbtn{pointer-events:auto;background:rgba(255,255,255,.10);color:#fff;
-    border:3px solid rgba(255,255,255,.22);border-radius:8px;padding:6px 11px;
-    font-size:11px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;cursor:pointer}
+    border:2px solid rgba(255,255,255,.22);border-radius:8px;padding:6px 9px;
+    font-size:10px;font-weight:900;letter-spacing:.03em;text-transform:uppercase;
+    cursor:pointer;white-space:nowrap}
   .tbtn.on{background:#F5D33C;color:#3A2A00;border-color:#000}
 
   #world{display:flex;gap:8px}
@@ -998,11 +999,11 @@ function drawDuck(r,d,y){
 function drawAnimal(a,y){
   shadow(a.x,y,0.62,0.46);
   const bob = Math.sin(a.t*7)*0.02, x=a.x, hx = x - a.dir*0.30;
+  /* alleen de twee pootjes aan de camerakant; de achterste twee gaan volledig
+     schuil achter het lijf — gemeten, nul pixels verschil */
   const leg = a.kind===0 ? SHEEPD : GOATH;
   box3(x-0.18, y-0.13, 0.09,0.09, 0, 0.16, leg);
   box3(x+0.18, y-0.13, 0.09,0.09, 0, 0.16, leg);
-  box3(x-0.18, y+0.13, 0.09,0.09, 0, 0.16, leg);
-  box3(x+0.18, y+0.13, 0.09,0.09, 0, 0.16, leg);
   if(a.kind===0){
     box3(x, y, 0.60, 0.44, 0.14+bob, 0.32, WOOL);
     box3(hx, y, 0.22, 0.24, 0.28+bob, 0.20, SHEEPD);
@@ -1966,10 +1967,11 @@ function drawLandmark(kind, y){
       box3(x+1.60, y+j*0.42, 0.26, 0.26, 1.85, 0.30, pal('#94513F'));
     }
     box3(x-0.95, y-0.10, 1.25, 1.25, 0, 2.85, pal('#B86952'));
-    for(let i=-1;i<=1;i++){
+    /* kantelen op de toren: alleen de voorste dwarsbalk is zichtbaar, de twee
+       erachter gaan volledig schuil achter de spits */
+    for(let i=-1;i<=1;i++)
       box3(x-0.95+i*0.44, y-0.10, 0.26, 1.25, 2.85, 0.26, pal('#A45A46'));
-      box3(x-0.95, y-0.10+i*0.44, 1.25, 0.26, 2.85, 0.26, pal('#A45A46'));
-    }
+    box3(x-0.95, y-0.54, 1.25, 0.26, 2.85, 0.26, pal('#A45A46'));
     box3(x-0.95, y-0.10, 1.40, 1.40, 3.11, 0.14, pal('#4E3028'));
     box3(x-0.95, y-0.10, 1.00, 1.00, 3.25, 0.55, pal('#63382C'));
     box3(x-0.95, y-0.10, 0.62, 0.62, 3.80, 0.50, pal('#573126'));
@@ -2149,25 +2151,24 @@ function drawObs(o,y){
     return;
   }
   if(o.kind===0){
-    /* boom: stam, brede onderkroon en een smallere top erop, met een lichtere
-       rand bovenaan — dat leest als een boom in plaats van een groene plaat */
+    /* Boom: stam, brede onderkroon en een smallere top erop. De lichtere
+       bovenrand is het bovenvlak van die top, dus daar is geen aparte bak
+       voor nodig — dat scheelt een kwart van het tekenwerk per boom. */
     box3(o.x, y, 0.34, 0.34, 0.15, 0.30, C.trunk);
     const kh=o.h;
-    box3(o.x,        y,        0.82, 0.82, 0.42,          kh*0.52, o.pal);
-    box3(o.x-0.03,   y+0.03,   0.64, 0.64, 0.42+kh*0.50,  kh*0.34, o.pal);
-    box3(o.x+0.02,   y-0.02,   0.40, 0.40, 0.42+kh*0.82,  kh*0.22,
-         pal(sh(o.pal[0],1.13)));
+    box3(o.x,      y,      0.82, 0.82, 0.42,         kh*0.52, o.pal);
+    box(o.x-0.03,  y+0.03, 0.62, 0.62, 0.42+kh*0.50, kh*0.50,
+        sh(o.pal[0],1.12), o.pal[1], o.pal[2]);
   }
   else if(o.kind===1){
     box3(o.x, y, 0.78, 0.78, 0.15, 0.30, C.bush);
-    box3(o.x-0.10, y+0.06, 0.50, 0.50, 0.43, 0.20, C.bushT);
-    box3(o.x+0.16, y-0.08, 0.34, 0.34, 0.41, 0.16, C.bushT);
+    box(o.x-0.08, y+0.05, 0.52, 0.52, 0.43, 0.21,
+        sh(C.bushT[0],1.06), C.bushT[1], C.bushT[2]);
   }
   else {
     /* kei: een grote blok met een kleinere er scheef bovenop */
     box3(o.x, y, 0.70, 0.68, 0.15, 0.34, C.rock);
     box3(o.x-0.09, y+0.06, 0.46, 0.44, 0.47, 0.19, pal(sh(C.rock[0],1.12)));
-    box3(o.x+0.40, y-0.16, 0.24, 0.22, 0.15, 0.15, pal(sh(C.rock[0],0.86)));
   }
 }
 /* ---------- eigen pixelfont (4x5) --------------------------------------------
@@ -2300,41 +2301,44 @@ const RUIT   = pal('#2B3F55'), BAND = pal('#1E1E26'), VELG = pal('#9A9CA6'),
       CHROOM = pal('#D4D8E0'), KOPL = pal('#FFF3C0'), ACHTL = pal('#D8342C'),
       RUBBER = pal('#26262E');
 /* Wielen aan de kant waar de camera naar kijkt; de andere kant zie je toch
-   niet, dus die slaan we over. Op dit formaat is een velg maar een paar
-   pixels, dus die tekenen we alleen als de auto groot genoeg in beeld staat. */
+   niet, dus die slaan we over. Een velg is op dit formaat maar vier pixels,
+   dus die laten we helemaal weg — dat scheelt de helft van het tekenwerk aan
+   wielen zonder dat je er iets van ziet. */
 function wielen(x, y, len, breed, z, dik){
   const wx=len*0.31, r=dik||0.16;
-  for(let s=-1;s<=1;s+=2){
-    box3(x+s*wx, y-breed/2+0.05, 0.28, 0.17, z, r, BAND);
-    if(TILE>30) box3(x+s*wx, y-breed/2+0.02, 0.13, 0.05, z+r*0.30, r*0.42, VELG);
-  }
+  box3(x-wx, y-breed/2+0.05, 0.28, 0.17, z, r, BAND);
+  box3(x+wx, y-breed/2+0.05, 0.28, 0.17, z, r, BAND);
+}
+/* Alleen het uiteinde aan de +x-kant is zichtbaar in deze camera. Rijdt de
+   auto naar rechts, dan kijk je tegen de koplampen aan; naar links tegen de
+   achterlichten. De andere kant zit achter de auto en hoeft dus niet. */
+function lampen(x, y, d, L, br, z, h){
+  const kl = d>0 ? KOPL : ACHTL;
+  box(x+(L/2-0.02), y, 0.07, br, z, h, kl[0], kl[1], kl[2]);
 }
 function drawAuto(x, y, d, v, p){
-  const L=v.len, br=0.76, dak=pal(sh(v.col,1.10));
+  const L=v.len, br=0.76, dak=sh(v.col,1.10);
   wielen(x, y, L, br, 0, 0.16);
   box3(x, y, L, br, 0.10, 0.19, p);                       /* onderbak */
   boxSides(x, y-br/2-0.005, L, 0.02, 0.10, 0.05, pal(sh(v.col,0.66)));  /* schaduwbies */
   const cx = x - d*(v.hatch ? 0.04 : 0.12);               /* cabine iets naar achteren */
   const cl = L*(v.hatch ? 0.60 : 0.50);
-  box3(cx, y, cl, br-0.07, 0.29, 0.20, p);                /* cabine */
+  /* het dak is meteen het bovenvlak van de cabine: scheelt een hele extra bak */
+  box(cx, y, cl, br-0.07, 0.29, 0.23, dak, p[1], p[2]);
   boxSides(cx, y-br/2+0.028, cl-0.14, 0.02, 0.32, 0.13, RUIT);          /* zijruiten */
-  box3(cx, y, cl-0.10, br-0.16, 0.49, 0.03, dak);         /* dak */
-  /* neus: grille met koplampen, staart: achterlichten */
-  box(x+d*(L/2-0.02), y, 0.07, br-0.06, 0.14, 0.13, KOPL[0], KOPL[1], KOPL[2]);
-  box(x-d*(L/2-0.02), y, 0.06, br-0.14, 0.15, 0.09, ACHTL[0], ACHTL[1], ACHTL[2]);
+  lampen(x, y, d, L, br-0.06, 0.14, 0.13);
 }
 function drawBestelbus(x, y, d, v, p){
   const L=v.len, br=0.82;
   wielen(x, y, L, br, 0, 0.17);
-  box3(x, y, L, br, 0.11, 0.46, C.white);                 /* hoge witte bak */
+  box(x, y, L, br, 0.11, 0.49, '#E8E8EE', C.white[1], C.white[2]);   /* hoge witte bak */
   box3(x + d*(L*0.22), y, L*0.42, br, 0.11, 0.34, p);     /* gekleurde cabine */
   boxSides(x + d*(L*0.24), y-br/2+0.02, L*0.30, 0.02, 0.30, 0.13, RUIT);
   boxSides(x - d*(L*0.20), y-br/2-0.005, L*0.44, 0.02, 0.24, 0.14, pal(sh(v.col,1.0)));
-  box3(x, y, L-0.14, br-0.14, 0.57, 0.03, pal('#E8E8EE'));
   ribbels(x - d*0.18, y, L*0.52, br-0.20, 0.60);
-  box(x+d*(L/2-0.02), y, 0.07, br-0.08, 0.16, 0.12, KOPL[0], KOPL[1], KOPL[2]);
+  lampen(x, y, d, L, br-0.08, 0.16, 0.12);
 }
-/* dwarsribbels op een groot wit dak, anders is het één saaie plaat */
+/* twee dwarsribbels op een groot wit dak, anders is het één saaie plaat */
 function ribbels(x, y, len, breed, z){
   const rib=pal('#D8D8E0');
   box3(x-len*0.18, y, 0.05, breed, z, 0.018, rib);
@@ -2343,21 +2347,17 @@ function ribbels(x, y, len, breed, z){
 /* De oldtimer: lange motorkap, hoge smalle cabine, losse spatborden,
    een treeplank, chromen grille en het reservewiel achterop. */
 function drawOldtimer(x, y, d, v, p){
-  const L=v.len, br=0.72, crm=pal('#EDE7D2');
+  const L=v.len, br=0.72;
   const wx=L*0.33;
-  for(let s=-1;s<=1;s+=2){                                /* dikke wielen met velg */
-    box3(x+s*wx, y-br/2+0.03, 0.24, 0.20, 0, 0.21, BAND);
-    box3(x+s*wx, y-br/2-0.01, 0.11, 0.05, 0.06, 0.09, CHROOM);
-    box3(x+s*wx, y, 0.30, br+0.10, 0.20, 0.07, p);        /* spatbord erover */
-  }
+  box3(x-wx, y-br/2+0.03, 0.24, 0.20, 0, 0.21, BAND);     /* dikke wielen */
+  box3(x+wx, y-br/2+0.03, 0.24, 0.20, 0, 0.21, BAND);
   box3(x, y, L*0.52, br+0.07, 0.055, 0.05, pal(sh(v.col,0.62)));        /* treeplank */
   box3(x, y, L, br, 0.11, 0.19, p);                       /* onderbak */
   box3(x + d*(L*0.27), y, L*0.42, br-0.07, 0.30, 0.12, p);/* lange motorkap */
-  boxSides(x + d*(L*0.27), y-br/2+0.04, L*0.36, 0.02, 0.33, 0.055, pal(sh(v.col,0.70)));
   const cx = x - d*(L*0.19);
-  box3(cx, y, L*0.38, br-0.05, 0.30, 0.25, p);            /* hoge, korte cabine */
+  /* het linnen dak is het bovenvlak van de cabine zelf */
+  box(cx, y, L*0.38, br-0.05, 0.30, 0.28, '#EDE7D2', p[1], p[2]);
   boxSides(cx, y-br/2+0.03, L*0.32, 0.02, 0.35, 0.15, RUIT);
-  box3(cx, y, L*0.40, br-0.01, 0.55, 0.035, crm);         /* linnen dak */
   box3(x + d*(L*0.02), y, 0.045, br-0.09, 0.42, 0.13, RUIT);  /* voorruit rechtop */
   /* chromen grille met twee ronde koplampen ernaast */
   box(x+d*(L/2-0.01), y, 0.06, br-0.24, 0.13, 0.23, CHROOM[0], CHROOM[1], CHROOM[2]);
@@ -2365,32 +2365,28 @@ function drawOldtimer(x, y, d, v, p){
     box3(x+d*(L/2-0.11), y+s*(br/2-0.07), 0.12, 0.12, 0.26, 0.11, KOPL);
   box3(x+d*(L/2-0.05), y, 0.09, br+0.07, 0.10, 0.045, CHROOM);           /* bumper */
   box3(x-d*(L/2+0.01), y, 0.09, 0.26, 0.14, 0.25, BAND);                 /* reservewiel */
-  box3(x-d*(L/2+0.02), y, 0.045, 0.11, 0.22, 0.10, CHROOM);
 }
 function drawTruck(x, y, d, v, p){
   const L=v.len, br=0.84;
   wielen(x, y, L, br, 0, 0.18);
   box3(x + d*0.06, y, L*0.15, br-0.10, 0.06, 0.14, RUBBER);              /* koppeling */
-  box3(x - d*0.42, y, L-0.85, br, 0.14, 0.56, C.white);                  /* oplegger */
+  box(x - d*0.42, y, L-0.85, br, 0.14, 0.57, '#E4E4EA', C.white[1], C.white[2]);
   boxSides(x - d*0.42, y-br/2-0.005, L-1.05, 0.02, 0.24, 0.22, pal(sh(v.col,1.0)));
-  box3(x - d*0.42, y, L-1.00, br-0.12, 0.68, 0.03, pal('#E4E4EA'));
-  ribbels(x - d*0.42, y, L-1.10, br-0.18, 0.71);
-  box3(x + d*(L/2-0.42), y, 0.84, br, 0.12, 0.46, p);                    /* cabine */
+  ribbels(x - d*0.42, y, L-1.10, br-0.18, 0.72);
+  box(x + d*(L/2-0.42), y, 0.84, br, 0.12, 0.49, sh(v.col,1.12), p[1], p[2]);
   boxSides(x + d*(L/2-0.42), y-br/2+0.025, 0.60, 0.02, 0.32, 0.15, RUIT);
-  box3(x + d*(L/2-0.42), y, 0.78, br-0.12, 0.57, 0.04, pal(sh(v.col,1.12)));
-  box(x + d*(L/2-0.01), y, 0.06, br-0.10, 0.16, 0.13, KOPL[0], KOPL[1], KOPL[2]);
+  lampen(x, y, d, L, br-0.10, 0.16, 0.13);
 }
 function drawBus(x, y, d, v){
-  const L=v.len, br=0.88, B=pal('#F2B713');
+  const L=v.len, br=0.88;
   wielen(x, y, L, br, 0, 0.18);
-  box3(x, y, L, br, 0.12, 0.72, B);
-  box3(x, y, L-0.16, br-0.10, 0.83, 0.05, pal('#E0A70F'));               /* dak */
+  box(x, y, L, br, 0.12, 0.76, '#E0A70F', '#D6A211', '#B8890E');         /* gele bak */
   boxSides(x, y-br/2-0.005, L-0.30, 0.02, 0.44, 0.24, pal('#2A3440'));   /* ramen */
   boxSides(x, y-br/2-0.006, L, 0.02, 0.19, 0.08, pal('#22222A'));        /* zwarte bies */
-  boxSides(x, y-br/2-0.006, L, 0.02, 0.72, 0.05, pal('#22222A'));
+  boxSides(x, y-br/2-0.006, L, 0.02, 0.74, 0.05, pal('#22222A'));
   box3(x - d*(L/2-0.16), y, 0.26, br, 0.12, 0.50, pal('#E8AE10'));       /* stompe neus */
-  box(x + d*(L/2+0.01), y, 0.08, br-0.20, 0.20, 0.14, KOPL[0], KOPL[1], KOPL[2]);
-  box3(x - d*(L/2-0.10), y, 0.14, 0.26, 0.84, 0.10, ACHTL);              /* zwaailicht */
+  lampen(x, y, d, L, br-0.20, 0.20, 0.14);
+  box3(x - d*(L/2-0.10), y, 0.14, 0.26, 0.88, 0.10, ACHTL);              /* zwaailicht */
 }
 function drawVeh(r,v,y){
   if(v.bike) return drawCyclist(r,v,y);
@@ -3269,23 +3265,28 @@ function tijdKort(s){
   const m=Math.floor(s/60), r=s%60;
   return m ? m+':'+(r<10?'0':'')+r : r+'s';
 }
-/* Het teamtabblad kan om drie redenen leeg zijn. Dit zegt welke het is,
-   in plaats van alleen "nog geen teams". */
+/* Een tabblad kan om verschillende redenen leeg zijn. Deze uitleg zegt welke
+   het is, in de woorden van het tabblad waar je op staat. */
 const SCRIPT_VERSIE = 4;                 /* hoort bij leaderboard-appsscript.gs */
+function scriptOud(){ return (lbData && lbData.versie || 0) < SCRIPT_VERSIE; }
 function teamUitleg(){
-  const v = lbData && lbData.versie || 0;
-  if(v < SCRIPT_VERSIE){
+  if(scriptOud()){
+    const wat = lbTab===3 ? 'Die telt de potjes niet per dag op, dus er valt hier '
+                          + 'nog niets te tekenen.'
+              : lbTab===2 ? 'Die bewaart niet hoe laat er gespeeld werd, dus dit '
+                          + 'tabblad blijft leeg.'
+              :             'Die slaat de teamnaam niet op, dus dit tabblad blijft leeg.';
     return '<b>Het script in je Google Spreadsheet is nog de oude versie.</b><br><br>'
-     + 'Die slaat de teamnaam en de tijd niet op, dus dit tabblad blijft leeg. '
-     + 'Zo werk je hem bij:<br><br>'
+     + wat + ' Zo werk je hem bij:<br><br>'
      + '1. Open je spreadsheet &rarr; Extensies &rarr; Apps Script<br>'
      + '2. Wis alles en plak <i>leaderboard-appsscript.gs</i> er opnieuw in, opslaan<br>'
      + '3. Implementeren &rarr; Implementatie beheren &rarr; potloodje &rarr; '
      + 'Versie: <i>Nieuwe versie</i> &rarr; Implementeren<br><br>'
-     + 'De link blijft hetzelfde. Potjes die je daarna speelt komen hier te staan.';
+     + 'Alleen opslaan is niet genoeg — zonder stap 3 blijft Google de oude versie '
+     + 'serveren. De link verandert niet.';
   }
   const d = lbData && lbData.diag;
-  if(d && d.regels && !d.metTeam){
+  if(lbTab!==3 && d && d.regels && !d.metTeam){
     return 'Er staan al ' + d.regels + ' uitslagen in, maar nog zonder teamnaam.<br><br>'
      + 'Vul op het keuzescherm bij <b>Team</b> een naam in voordat je start. '
      + 'Hij wordt onthouden, dus dat hoeft maar één keer.';
@@ -3379,7 +3380,10 @@ function tekenTabel(){
   const box=$('lbBox');
   const teams = lbTab===1, nachts = lbTab===2, gebruik = lbTab===3;
   const rij = nachts ? (lbData.nacht||[]) : teams ? (lbData.teams||[]) : (lbData.lijst||[]);
-  const oud = (lbData && lbData.versie || 0) < SCRIPT_VERSIE;
+  const oud = scriptOud();
+  /* Bij een oud script krijgt dit tabblad zo meteen de hele uitleg te zien;
+     dan hoeft de waarschuwing er niet ook nog boven te staan. */
+  const uitlegVolgt = oud && (gebruik || nachts || teams || !rij.length);
   $('lbSub').innerHTML = (gebruik
       ? 'het totaal aantal potjes, opgeteld sinds dag \u00e9\u00e9n'
       : nachts
@@ -3387,14 +3391,15 @@ function tekenTabel(){
       : teams
       ? 'per team, beide spelers bij elkaar opgeteld'
       : 'per personage, alle potjes bij elkaar opgeteld')
-    + (oud ? '<br><b class="waarsch">Let op: het script in je spreadsheet is nog de '
-             + 'oude versie, dus Team, Snelst, Nachtbrakers en Gebruik blijven leeg.</b>' : '');
+    + (oud && !uitlegVolgt
+       ? '<br><b class="waarsch">Let op: het script in je spreadsheet is nog de '
+         + 'oude versie, dus Snelst blijft leeg.</b>' : '');
   if(gebruik){
     box.innerHTML = oud ? '<div id="lbMsg">'+teamUitleg()+'</div>' : tekenGebruik();
     return;
   }
   if(!rij.length){
-    box.innerHTML='<div id="lbMsg">'+((teams||nachts) ? teamUitleg()
+    box.innerHTML='<div id="lbMsg">'+((teams||nachts||oud) ? teamUitleg()
       : 'Nog geen potjes gespeeld. Wees de eerste!')+'</div>';
     return;
   }
