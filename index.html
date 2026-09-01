@@ -276,6 +276,22 @@
       font-size:20px;font-weight:900;color:#fff;letter-spacing:.04em;line-height:1.5}
   }
 
+  /* zondagsscherm: rustig, warm en over alles heen */
+  #rust{position:fixed;inset:0;z-index:90;display:flex;align-items:center;
+    justify-content:center;padding:26px;box-sizing:border-box;
+    background:radial-gradient(120% 80% at 50% 24%,#2A3A5E 0%,#16203A 55%,#0C1224 100%)}
+  #rust.hide{display:none}
+  .rustkaart{max-width:22em;text-align:center;color:#EAF0FF}
+  .rustzon{width:74px;height:74px;margin:0 auto 20px;border-radius:50%;
+    background:radial-gradient(circle at 42% 38%,#FFE9A8,#F5C64A 58%,#D69A22 100%);
+    box-shadow:0 0 34px rgba(245,198,74,.34)}
+  .rusttitel{font-size:min(9vw,34px);line-height:1.25;color:#FFDE7A;
+    text-shadow:2px 2px 0 rgba(0,0,0,.55);margin-bottom:16px}
+  #rust p{font-size:15px;font-weight:700;line-height:1.65;color:#D6DEF2;
+    text-shadow:1px 1px 0 rgba(0,0,0,.5);margin:0 0 22px}
+  .rustvoet{font-size:12px;font-weight:900;letter-spacing:.14em;
+    text-transform:uppercase;color:rgba(214,222,242,.55)}
+
   #doneBtn{position:absolute;left:50%;transform:translateX(-50%);
     bottom:calc(52px + env(safe-area-inset-bottom));z-index:9}
   #doneBtn.hide{display:none}
@@ -296,6 +312,17 @@
      voordat het spel speelbaar is. -->
 <audio id="bgm" loop preload="auto" playsinline webkit-playsinline></audio>
 <div id="rotate">Draai je telefoon rechtop<br>om te spelen</div>
+
+<!-- Op zondag blijft het spel dicht. -->
+<div id="rust" class="hide">
+  <div class="rustkaart">
+    <div class="rustzon"></div>
+    <div class="pix rusttitel">Zondag<br>is een rustdag</div>
+    <p>We vragen je vriendelijk om te wachten tot maandag
+       om dit spel te spelen.</p>
+    <div class="rustvoet">Tot morgen!</div>
+  </div>
+</div>
 <div id="wrap">
   <canvas id="cv"></canvas>
   <div class="ui">
@@ -2930,6 +2957,12 @@ function frame(ts){
   let dt=(ts-last)/1000; last=ts;
   if(dt>0.05) dt=0.05;
 
+  /* eens per halve minuut kijken welke dag het is; zo verdwijnt het
+     zondagsscherm vanzelf zodra het maandag wordt */
+  rustT+=dt;
+  if(rustT>30){ rustT=0; rustCheck(); }
+  if(rustAan) return;                /* op zondag staat alles stil */
+
   if(gs==='count'){
     countT-=dt;
     const n=Math.ceil(countT);
@@ -3098,6 +3131,7 @@ function winTogether(){
   }
   endScr.classList.remove('hide');
   if(navigator.vibrate) try{navigator.vibrate([60,50,60,50,120]);}catch(e){}
+  rustCheck();                       /* is het inmiddels zondag geworden? */
 }
 /* de drie doelen van dit potje op het eindscherm, met hun stand */
 function toonUitdagingen(){
@@ -3143,6 +3177,7 @@ function finish(){
   meldRonde(false);
   endScr.classList.remove('hide');
   if(navigator.vibrate) try{navigator.vibrate(80);}catch(e){}
+  rustCheck();                       /* is het inmiddels zondag geworden? */
 }
 
 /* Munten van dit potje bijschrijven: één per gehaalde rij, per speler.
@@ -3174,7 +3209,28 @@ function goHome(){
   hud();
 }
 
+/* ---------- zondag --------------------------------------------------------------
+   Op zondag blijft het spel dicht. Begint de zondag terwijl er nog een potje
+   loopt, dan onderbreken we dat niet halverwege: het scherm verschijnt zodra
+   de ronde klaar is. */
+function isZondag(){ return new Date().getDay()===0; }
+let rustAan=false, rustT=0;
+function rustCheck(){
+  const el=$('rust'); if(!el) return;
+  const bezig = gs==='play' || gs==='count' || gs==='dying';
+  const moet = isZondag() && !bezig;
+  if(moet===rustAan) return;
+  rustAan = moet;
+  if(moet){
+    el.classList.remove('hide');
+    try{ bgm.pause(); }catch(e){}
+  }else{
+    el.classList.add('hide');
+  }
+}
+
 function start(){
+  if(isZondag()){ rustCheck(); return; }      /* vandaag niet */
   resetRound();
   nieuweUitdagingen();               /* drie verse doelen voor dit potje */
   laatsteWinst=0;
@@ -3774,6 +3830,7 @@ document.addEventListener('visibilitychange', ()=>{
 })();
 
 resize();
+rustCheck();           /* op zondag komen we niet verder dan het rustscherm */
 laadSpul();            /* munten en gadgets van de vorige keer terughalen */
 resetRound();          /* wereld draait als achtergrond achter het menu */
 hud();
