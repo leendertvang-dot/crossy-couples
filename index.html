@@ -2727,8 +2727,14 @@ function tekenDonker(){
 
 const oX=new Float64Array(48), oK=new Int8Array(48), oR=new Array(48);
 let oN=0;
-function push(x,k,ref){
-  if(oN>=48 || x<vx0-3 || x>vx1+3) return;
+/* Objecten buiten het zichtbare stuk van de rij hoeven niet getekend te worden.
+   Vroeger gold overal dezelfde ruime marge van drie tegels; nu geeft elke
+   aanroep zijn eigen halve breedte mee, zodat een boompje eerder afvalt dan
+   een spoorwegovergang met een slagboom van tweeënhalve meter. Scheelt dat we
+   voor een derde van de objecten helemaal geen vlakken meer uitrekenen. */
+function push(x,k,ref,hw){
+  const m = hw===undefined ? 3 : hw;
+  if(oN>=48 || x<vx0-m || x>vx1+m) return;
   let i=oN++;
   while(i>0 && oX[i-1]>x){ oX[i]=oX[i-1]; oK[i]=oK[i-1]; oR[i]=oR[i-1]; i--; }
   oX[i]=x; oK[i]=k; oR[i]=ref;
@@ -2748,39 +2754,47 @@ function draw(){
     if(r.type==='grass'||r.type==='finish') drawGrassStrip(r); else drawGround(r);
 
     oN=0;
+    /* de halve breedte per soort, zodat we niets wegsnijden dat nog net in
+       beeld hangt; de poort en het feestterrein zijn zo breed als de weg */
     if(r.deco) push(r.deco==='ballpit' ? 2.3 : r.deco==='flagpole' ? 3.2
                   : (r.deco==='gate'||r.deco==='president'||r.deco==='whitehouse'
                      ||r.deco==='kampvuur'||r.deco==='poort') ? 0
-                  : -2.3, 11, r.deco);
-    if(r.lm)   push(XMIN-2.2, 9, r.lm);
-    if(r.sign) push(XMIN-2.2, 10, r);
+                  : -2.3, 11, r.deco, 5.4);
+    if(r.lm)   push(XMIN-2.2, 9, r.lm, 3.0);
+    if(r.sign) push(XMIN-2.2, 10, r, 3.0);
     if(r.type==='grass'){
-      if(r.obs) for(let i=0;i<r.obs.length;i++) push(r.obs[i].x,0,r.obs[i]);
+      if(r.obs) for(let i=0;i<r.obs.length;i++) push(r.obs[i].x,0,r.obs[i],0.9);
       if(r.animals) for(let i=0;i<r.animals.length;i++){
-        const a=r.animals[i]; if(!a.gone) push(a.x,8,a);
+        const a=r.animals[i]; if(!a.gone) push(a.x,8,a,0.9);
       }
     }
-    else if(r.type==='road'||r.type==='bike'){ for(let i=0;i<r.veh.length;i++) push(vehX(r,r.veh[i]),1,r.veh[i]); }
+    else if(r.type==='road'||r.type==='bike'){
+      for(let i=0;i<r.veh.length;i++){
+        const v=r.veh[i];
+        push(vehX(r,v), 1, v, v.bike ? 1.4 : v.len/2+0.5);   /* fietser praat */
+      }
+    }
     else if(r.type==='water'){
-      for(let i=0;i<r.logs.length;i++) push(logC(r,i),2,i);
+      for(let i=0;i<r.logs.length;i++) push(logC(r,i),2,i, r.logs[i].len/2+0.9);
       if(r.ducks) for(let i=0;i<r.ducks.length;i++)
-        push(wrapX(r.ducks[i].o + r.dir*r.speed*0.45*T), 12, r.ducks[i]);
+        push(wrapX(r.ducks[i].o + r.dir*r.speed*0.45*T), 12, r.ducks[i], 0.7);
     }
     else if(r.type==='rail'){          /* alleen op het spoor staat een overgang */
-      if(r.state==='run') push(r.trainX,3,null);
-      push(XMIN-1.2,4,-1); push(XMAX+1.2,4,1);
+      if(r.state==='run') push(r.trainX,3,null, TRAINLEN/2+0.8);
+      push(XMIN-1.2,4,-1,3.2); push(XMAX+1.2,4,1,3.2);
     }
     /* baby's eerst, dan de spelers; wie op de ander staat wordt als laatste getekend */
-    if(p1) for(let i=0;i<p1.nb;i++){ const b=p1.bb[i]; if(Math.round(b.y)===y) push(b.x,7,b); }
-    if(p2) for(let i=0;i<p2.nb;i++){ const b=p2.bb[i]; if(Math.round(b.y)===y) push(b.x,7,b); }
+    if(p1) for(let i=0;i<p1.nb;i++){ const b=p1.bb[i]; if(Math.round(b.y)===y) push(b.x,7,b,0.8); }
+    if(p2) for(let i=0;i<p2.nb;i++){ const b=p2.bb[i]; if(Math.round(b.y)===y) push(b.x,7,b,0.8); }
+    /* spelers ruim: de ooievaar draagt je tot ver buiten beeld */
     if(p1 && p2 && p1.stack===p2){
-      if(Math.round(p2.py)===y) push(p2.x,5,p2);
-      if(Math.round(p1.py)===y) push(p1.x,5,p1);
+      if(Math.round(p2.py)===y) push(p2.x,5,p2,7.5);
+      if(Math.round(p1.py)===y) push(p1.x,5,p1,7.5);
     }else{
-      if(p1 && Math.round(p1.py)===y) push(p1.x,5,p1);
-      if(p2 && Math.round(p2.py)===y) push(p2.x,5,p2);
+      if(p1 && Math.round(p1.py)===y) push(p1.x,5,p1,7.5);
+      if(p2 && Math.round(p2.py)===y) push(p2.x,5,p2,7.5);
     }
-    for(let i=0;i<P.length;i++){ const p=P[i]; if(p.life>0 && Math.round(p.y)===y) push(p.x,6,p); }
+    for(let i=0;i<P.length;i++){ const p=P[i]; if(p.life>0 && Math.round(p.y)===y) push(p.x,6,p,0.5); }
 
     for(let i=0;i<oN;i++){
       switch(oK[i]){
